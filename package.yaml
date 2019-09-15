@@ -1,0 +1,52 @@
+name:                bene
+version:             0.1.0.0
+github:              "ix/bene"
+license:             BSD3
+author:              "Rose"
+maintainer:          "rose@empty.town"
+copyright:           "Rose 2019"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/ix/bene#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- text
+- gi-gtk
+- gi-gtk-declarative
+- gi-gtk-declarative-app-simple
+
+library:
+  source-dirs: src
+
+executables:
+  bene-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - bene
+
+tests:
+  bene-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - bene
