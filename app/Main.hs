@@ -4,33 +4,34 @@
 
 module Main where
 
-import           Data.Function                 ((&))
-import           Data.Text                     (Text)
-import           Control.Monad                 (void)
-
-import           GI.Gtk                        (Label (..), Window (..))
+import           Data.Text                      ( Text )
+import           Control.Monad                  ( void )
+import           GI.Gtk                         ( Window (..), TextView (..))
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
 
-data State = Initial | Greeting Text
+data State = Initial
 
-data Event = Greet Text | Closed
+data Event = Closed
 
 view' :: State -> AppView Window Event
 view' s =
-  bin Window [#title := "Hello", on #deleteEvent (const (True, Closed)), #widthRequest := 400, #heightRequest := 300]
+  bin
+      Window
+      [ #title := "Bene"
+      , on #deleteEvent (const (True, Closed))
+      , #widthRequest := 400
+      , #heightRequest := 300
+      ]
     $ case s of
-        Initial      -> widget Label [#label := "Nothing here yet."]
-        Greeting who -> widget Label [#label := who]
+        Initial -> widget TextView []
 
 update' :: State -> Event -> Transition State Event
-update' _ (Greet who) = Transition (Greeting "hi") (return Nothing)
-update' _ Closed      = Exit
+update' _ Closed = Exit
 
 main :: IO ()
-main = void $ run App
-  { view         = view'
-  , update       = update'
-  , inputs       = []
-  , initialState = Initial
-  }
+main = void $ run App { view         = view'
+                      , update       = update'
+                      , inputs       = []
+                      , initialState = Initial
+                      }
