@@ -12,10 +12,10 @@ import           GI.Gtk                         ( Window(..)
                                                 , TextView(..)
                                                 , FileChooserDialog(..)
                                                 , Button(..)
-                                                , FlowBox(..)
-                                                , FlowBoxChild(..)
+                                                , Box(..)
                                                 , Label(..)
                                                 , Orientation(..)
+                                                , Align(..)
                                                 , fileChooserGetFilename
                                                 )
 import           GI.Gtk.Declarative
@@ -36,9 +36,9 @@ view' s =
       ]
     $ case s of
         Fileless ->
-          container FlowBox []
-            $ [ bin FlowBoxChild [] $ widget Button [#label := "New File"]
-              , bin FlowBoxChild [] $ widget Button [#label := "Open File"]
+          container Box [#orientation := OrientationHorizontal, #expand := True]
+            $ [widget Button [#label := "New File", #vexpand := True, #hexpand := True, #halign := AlignFill, #valign := AlignFill]
+              ,widget Button [#label := "Open File", #vexpand := True, #hexpand := True, #halign := AlignFill, #valign := AlignFill]
               ]
         FileOpened file -> widget Label [#label := pack file]
 
