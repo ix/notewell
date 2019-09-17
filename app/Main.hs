@@ -10,9 +10,12 @@ import           Data.Text                      ( Text
 import           Control.Monad                  ( void )
 import           GI.Gtk                         ( Window(..)
                                                 , TextView(..)
-                                                , FileChooserButton(..)
+                                                , FileChooserDialog(..)
                                                 , Button(..)
+                                                , FlowBox(..)
+                                                , FlowBoxChild(..)
                                                 , Label(..)
+                                                , Orientation(..)
                                                 , fileChooserGetFilename
                                                 )
 import           GI.Gtk.Declarative
@@ -32,9 +35,11 @@ view' s =
       , #heightRequest := 300
       ]
     $ case s of
-        Fileless -> widget
-          FileChooserButton
-          [onM #selectionChanged (fmap FileSelected . fileChooserGetFilename)]
+        Fileless ->
+          container FlowBox []
+            $ [ bin FlowBoxChild [] $ widget Button [#label := "New File"]
+              , bin FlowBoxChild [] $ widget Button [#label := "Open File"]
+              ]
         FileOpened file -> widget Label [#label := pack file]
 
 update' :: State -> Event -> Transition State Event
