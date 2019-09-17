@@ -36,11 +36,14 @@ view' s =
       ]
     $ case s of
         Fileless ->
-          container Box [#orientation := OrientationHorizontal, #expand := True]
-            $ [widget Button [#label := "New File", #vexpand := True, #hexpand := True, #halign := AlignFill, #valign := AlignFill]
-              ,widget Button [#label := "Open File", #vexpand := True, #hexpand := True, #halign := AlignFill, #valign := AlignFill]
+          container Box [#orientation := OrientationHorizontal]
+            $ [ expandableChild $ widget Button [#label := "New Document", classes ["introButton"]]
+              , expandableChild $ widget Button [#label := "Open Document", classes ["introButton"]]
               ]
         FileOpened file -> widget Label [#label := pack file]
+
+expandableChild :: Widget a -> BoxChild a
+expandableChild = BoxChild defaultBoxChildProperties { expand = True, fill = True }
 
 update' :: State -> Event -> Transition State Event
 update' _ (FileSelected (Just file)) =
