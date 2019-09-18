@@ -26,6 +26,7 @@ dependencies:
 - gi-gtk-declarative
 - gi-gtk-declarative-app-simple
 - cmark-gfm
+- vector
 
 library:
   source-dirs: src
