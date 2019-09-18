@@ -11,16 +11,16 @@ import           Control.Monad                  ( void )
 import           GI.Gtk                         ( Window(..)
                                                 , TextView(..)
                                                 , FileChooserDialog(..)
-                                                , Button(..)
+                                                , ToolButton(..)
                                                 , Box(..)
                                                 , Label(..)
                                                 , Orientation(..)
                                                 , Align(..)
                                                 , fileChooserGetFilename
                                                 )
-import           Control.Concurrent.Async       (async)
-import qualified GI.Gdk                         as Gdk
-import qualified GI.Gtk as Gtk
+import           Control.Concurrent.Async       ( async )
+import qualified GI.Gdk                        as Gdk
+import qualified GI.Gtk                        as Gtk
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
 import           Paths_bene
@@ -41,13 +41,16 @@ view' s =
     $ case s of
         Welcome ->
           container Box [#orientation := OrientationHorizontal]
-            $ [ expandableChild $ widget Button [#label := "New Document", classes ["introButton"]]
-              , expandableChild $ widget Button [#label := "Open Document", classes ["introButton"]]
+            $ [ expandableChild
+                $ widget ToolButton [#iconName := "document-new", classes ["intro"]]
+              , expandableChild
+                $ widget ToolButton [#iconName := "document-open", classes ["intro"]]
               ]
         FileOpened file -> widget Label [#label := pack file]
 
 expandableChild :: Widget a -> BoxChild a
-expandableChild = BoxChild defaultBoxChildProperties { expand = True, fill = True }
+expandableChild =
+  BoxChild defaultBoxChildProperties { expand = True, fill = True }
 
 update' :: State -> Event -> Transition State Event
 update' _ (FileSelected (Just file)) =
@@ -59,9 +62,9 @@ main :: IO ()
 main = do
   void $ Gtk.init Nothing
 
-  path <- pack <$> getDataFileName "themes/test.css"
+  path     <- pack <$> getDataFileName "themes/giorno/giorno.css"
 
-  screen <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
+  screen   <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
   provider <- Gtk.cssProviderNew
   Gtk.cssProviderLoadFromPath provider path
   Gtk.styleContextAddProviderForScreen
@@ -73,9 +76,6 @@ main = do
     void $ runLoop app
     Gtk.mainQuit
   Gtk.main
-  where
-    app = App { view         = view'
-              , update       = update'
-              , inputs       = []
-              , initialState = Welcome
-              }
+ where
+  app =
+    App { view = view', update = update', inputs = [], initialState = Welcome }

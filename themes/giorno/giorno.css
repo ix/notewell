@@ -1,0 +1,17 @@
+@define-color bg_color #f8f8f8;
+@define-color accent_color #EB2F7D;
+@define-color fg_color #252526;
+
+.intro button {
+    border: none;
+    border-radius: 0px;
+    margin: 0;
+    padding: 0;
+    background: @bg_color;
+    font-size: 1.2em;
+    box-shadow: none;
+}
+
+.intro button:active {
+    background: @accent_color;
+}
