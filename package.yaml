@@ -10,6 +10,9 @@ extra-source-files:
 - README.md
 - ChangeLog.md
 
+data-files:
+- themes/test.css
+
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
 # category:            Web
@@ -27,6 +30,9 @@ dependencies:
 - gi-gtk-declarative-app-simple
 - cmark-gfm
 - vector
+- gi-gdk
+- async
+- bytestring
 
 library:
   source-dirs: src
