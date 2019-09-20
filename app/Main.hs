@@ -16,6 +16,7 @@ import           GI.Gtk                         ( Window(..)
                                                 , Label(..)
                                                 , Orientation(..)
                                                 , Align(..)
+                                                , ScrolledWindow(..)
                                                 , fileChooserGetFilename
                                                 )
 import           Control.Concurrent.Async       ( async )
@@ -25,9 +26,9 @@ import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
 import           Paths_bene
 
-data State = Welcome | FileOpened FilePath
+data State = Welcome | FileOpened FilePath | Editing (Maybe Text)
 
-data Event = Closed | FileSelected (Maybe FilePath)
+data Event = Closed | FileSelected (Maybe FilePath) | NewDocument
 
 view' :: State -> AppView Window Event
 view' s =
@@ -41,12 +42,18 @@ view' s =
     $ case s of
         Welcome ->
           container Box [#orientation := OrientationHorizontal]
-            $ [ expandableChild
-                $ widget ToolButton [#iconName := "document-new", classes ["intro"]]
-              , expandableChild
-                $ widget ToolButton [#iconName := "document-open", classes ["intro"]]
+            $ [ expandableChild $ widget
+                ToolButton
+                [ #iconName := "document-new"
+                , classes ["intro"]
+                , on #clicked NewDocument
+                ]
+              , expandableChild $ widget
+                ToolButton
+                [#iconName := "document-open", classes ["intro"]]
               ]
         FileOpened file -> widget Label [#label := pack file]
+        Editing    _    -> bin ScrolledWindow [] $ widget TextView [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
 
 expandableChild :: Widget a -> BoxChild a
 expandableChild =
@@ -56,6 +63,7 @@ update' :: State -> Event -> Transition State Event
 update' _ (FileSelected (Just file)) =
   Transition (FileOpened file) (return Nothing)
 update' s (FileSelected Nothing) = Transition s (return Nothing)
+update' _ NewDocument            = Transition (Editing Nothing) (return Nothing)
 update' _ Closed                 = Exit
 
 main :: IO ()

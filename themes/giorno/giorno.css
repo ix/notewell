@@ -15,3 +15,25 @@
 .intro button:active {
     background: @accent_color;
 }
+
+scrolledwindow {
+    background: @bg_color;
+}
+
+.editor {
+    font-family: "Lato", serif; 
+    padding: 0.75rem;
+    font-size: 1.5em;
+    background: @bg_color;
+    caret-color: @accent_color;
+}
+
+.editor text {
+    background: @bg_color;
+    color: @fg_color;
+}
+
+.editor text selection {
+    background: @accent_color;
+    color: @bg_color;
+}
