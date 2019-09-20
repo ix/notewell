@@ -10,13 +10,14 @@ import           Data.Text                      ( Text
 import           Control.Monad                  ( void )
 import           GI.Gtk                         ( Window(..)
                                                 , TextView(..)
-                                                , FileChooserDialog(..)
+                                                , FileChooserWidget(..)
                                                 , ToolButton(..)
                                                 , Box(..)
                                                 , Label(..)
                                                 , Orientation(..)
                                                 , Align(..)
                                                 , ScrolledWindow(..)
+                                                , TextBuffer(..)
                                                 , fileChooserGetFilename
                                                 )
 import           Control.Concurrent.Async       ( async )
@@ -26,9 +27,9 @@ import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
 import           Paths_bene
 
-data State = Welcome | FileOpened FilePath | Editing (Maybe Text)
+data State = Welcome | FileSelection | Editing (Maybe TextBuffer)
 
-data Event = Closed | FileSelected (Maybe FilePath) | NewDocument
+data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument
 
 view' :: State -> AppView Window Event
 view' s =
@@ -45,15 +46,19 @@ view' s =
             $ [ expandableChild $ widget
                 ToolButton
                 [ #iconName := "document-new"
-                , classes ["intro"]
                 , on #clicked NewDocument
+                , classes ["intro"]
                 ]
               , expandableChild $ widget
                 ToolButton
-                [#iconName := "document-open", classes ["intro"]]
+                [ #iconName := "document-open"
+                , on #clicked OpenDocument
+                , classes ["intro"]
+                ]
               ]
-        FileOpened file -> widget Label [#label := pack file]
-        Editing    _    -> bin ScrolledWindow [] $ widget TextView [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
+        FileSelection -> widget FileChooserWidget [onM #fileActivated (fmap FileSelected . fileChooserGetFilename)]
+        Editing _     -> bin ScrolledWindow []
+          $ widget TextView [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
 
 expandableChild :: Widget a -> BoxChild a
 expandableChild =
@@ -61,9 +66,10 @@ expandableChild =
 
 update' :: State -> Event -> Transition State Event
 update' _ (FileSelected (Just file)) =
-  Transition (FileOpened file) (return Nothing)
+  Transition (Editing Nothing) (return Nothing)
 update' s (FileSelected Nothing) = Transition s (return Nothing)
 update' _ NewDocument            = Transition (Editing Nothing) (return Nothing)
+update' _ OpenDocument           = Transition FileSelection (return Nothing)
 update' _ Closed                 = Exit
 
 main :: IO ()
