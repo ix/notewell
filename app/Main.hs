@@ -9,6 +9,7 @@ import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
 import qualified Data.Text.Encoding            as T
 import           Control.Monad                  ( void )
+import Control.Monad.IO.Class
 import           GI.Gtk                         ( Window(..)
                                                 , TextView(..)
                                                 , FileChooserWidget(..)
@@ -29,7 +30,7 @@ import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
 import           Paths_bene
 
-data State = Welcome | FileSelection | Editing (Maybe TextBuffer)
+data State = Welcome | FileSelection | Editing (Maybe (IO TextBuffer))
 
 data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument
 
@@ -69,8 +70,12 @@ view' s =
         FileSelection -> widget
           FileChooserWidget
           [onM #fileActivated (fmap FileSelected . fileChooserGetFilename)]
-        Editing _ -> bin ScrolledWindow []
+        Editing Nothing -> bin ScrolledWindow []
           $ widget TextView [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
+        Editing buf -> do 
+          let tv = widget TextView [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
+          Gtk.textViewSetBuffer tv buf
+          bin ScrolledWindow [] tv
 
 expandableChild :: Widget a -> BoxChild a
 expandableChild =
@@ -78,7 +83,7 @@ expandableChild =
 
 update' :: State -> Event -> Transition State Event
 update' _ (FileSelected (Just file)) =
-  Transition (Editing Nothing) (return Nothing)
+  Transition (Editing $ Just $ bufferFromFile file) (return Nothing)
 update' s (FileSelected Nothing) = Transition s (return Nothing)
 update' _ NewDocument            = Transition (Editing Nothing) (return Nothing)
 update' _ OpenDocument           = Transition FileSelection (return Nothing)
