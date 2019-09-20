@@ -5,9 +5,9 @@
 module Main where
 
 import           Data.Text                      ( Text )
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import qualified Data.Text.Encoding as T
+import qualified Data.Text                     as T
+import qualified Data.Text.IO                  as T
+import qualified Data.Text.Encoding            as T
 import           Control.Monad                  ( void )
 import           GI.Gtk                         ( Window(..)
                                                 , TextView(..)
@@ -24,7 +24,7 @@ import           GI.Gtk                         ( Window(..)
 import           Control.Concurrent.Async       ( async )
 import qualified GI.Gdk                        as Gdk
 import qualified GI.Gtk                        as Gtk
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8         as BS
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
 import           Paths_bene
@@ -35,9 +35,9 @@ data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument
 
 bufferFromFile :: FilePath -> IO TextBuffer
 bufferFromFile filename = do
-  buffer <- Gtk.textBufferNew Gtk.noTextTagTable-- [TODO] Implement tag table.
+  buffer   <- Gtk.textBufferNew Gtk.noTextTagTable-- [TODO] Implement tag table.
   contents <- T.readFile filename
-  Gtk.textBufferSetText buffer contents $ byteLength contents 
+  Gtk.textBufferSetText buffer contents $ byteLength contents
   return buffer
   where byteLength = fromIntegral . BS.length . T.encodeUtf8
 
@@ -66,8 +66,10 @@ view' s =
                 , classes ["intro"]
                 ]
               ]
-        FileSelection -> widget FileChooserWidget [onM #fileActivated (fmap FileSelected . fileChooserGetFilename)]
-        Editing _     -> bin ScrolledWindow []
+        FileSelection -> widget
+          FileChooserWidget
+          [onM #fileActivated (fmap FileSelected . fileChooserGetFilename)]
+        Editing _ -> bin ScrolledWindow []
           $ widget TextView [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
 
 expandableChild :: Widget a -> BoxChild a
