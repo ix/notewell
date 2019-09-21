@@ -9,18 +9,6 @@ import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
 import qualified Data.Text.Encoding            as T
 import           Control.Monad
-import           GI.Gtk                         ( Window(..)
-                                                , TextView(..)
-                                                , FileChooserWidget(..)
-                                                , ToolButton(..)
-                                                , Box(..)
-                                                , Label(..)
-                                                , Orientation(..)
-                                                , Align(..)
-                                                , ScrolledWindow(..)
-                                                , TextBuffer(..)
-                                                , fileChooserGetFilename
-                                                )
 import           Control.Concurrent.Async       ( async )
 import qualified GI.Gdk                        as Gdk
 import qualified GI.Gtk                        as Gtk
@@ -29,11 +17,11 @@ import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
 import           Paths_bene
 
-data State = Welcome | FileSelection | Blank | Editing (IO TextBuffer)
+data State = Welcome | FileSelection | Blank | Editing (IO Gtk.TextBuffer)
 
 data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument
 
-bufferFromFile :: FilePath -> IO TextBuffer
+bufferFromFile :: FilePath -> IO Gtk.TextBuffer
 bufferFromFile filename = do
   buffer   <- Gtk.textBufferNew Gtk.noTextTagTable-- [TODO] Implement tag table.
   contents <- T.readFile filename
@@ -41,10 +29,10 @@ bufferFromFile filename = do
   return buffer
   where byteLength = fromIntegral . BS.length . T.encodeUtf8
 
-view' :: State -> AppView Window Event
+view' :: State -> AppView Gtk.Window Event
 view' s =
   bin
-      Window
+      Gtk.Window
       [ #title := "Bene"
       , on #deleteEvent (const (True, Closed))
       , #widthRequest := 480
@@ -52,27 +40,29 @@ view' s =
       ]
     $ case s of
         Welcome ->
-          container Box [#orientation := OrientationHorizontal]
+          container Gtk.Box [#orientation := Gtk.OrientationHorizontal]
             $ [ expandableChild $ widget
-                ToolButton
+                Gtk.ToolButton
                 [ #iconName := "document-new"
                 , on #clicked NewDocument
                 , classes ["intro"]
                 ]
               , expandableChild $ widget
-                ToolButton
+                Gtk.ToolButton
                 [ #iconName := "document-open"
                 , on #clicked OpenDocument
                 , classes ["intro"]
                 ]
               ]
         FileSelection -> widget
-          FileChooserWidget
-          [onM #fileActivated (fmap FileSelected . fileChooserGetFilename)]
-        Blank -> bin ScrolledWindow []
-          $ widget TextView [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
-        Editing buffer -> bin ScrolledWindow [] $ widget
-          TextView
+          Gtk.FileChooserWidget
+          [onM #fileActivated (fmap FileSelected . Gtk.fileChooserGetFilename)]
+        Blank -> bin Gtk.ScrolledWindow []
+          $ widget
+              Gtk.TextView
+              [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
+        Editing buffer -> bin Gtk.ScrolledWindow [] $ widget
+          Gtk.TextView
           [ afterCreated $ \tv -> Gtk.textViewSetBuffer tv . Just =<< buffer
           , #wrapMode := Gtk.WrapModeWord
           , classes ["editor"]
