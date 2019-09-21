@@ -15,6 +15,7 @@ import qualified GI.Gtk                        as Gtk
 import qualified Data.ByteString.Char8         as BS
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
+import Bene.Renderer (bytes)
 import           Paths_bene
 
 data State = Welcome | FileSelection | Blank | Editing (IO Gtk.TextBuffer)
@@ -23,11 +24,10 @@ data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument
 
 bufferFromFile :: FilePath -> IO Gtk.TextBuffer
 bufferFromFile filename = do
-  buffer   <- Gtk.textBufferNew Gtk.noTextTagTable-- [TODO] Implement tag table.
+  buffer   <- Gtk.textBufferNew Gtk.noTextTagTable
   contents <- T.readFile filename
-  Gtk.textBufferSetText buffer contents $ byteLength contents
+  Gtk.textBufferSetText buffer contents $ fromIntegral $ bytes contents
   return buffer
-  where byteLength = fromIntegral . BS.length . T.encodeUtf8
 
 view' :: State -> AppView Gtk.Window Event
 view' s =
