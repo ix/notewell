@@ -8,43 +8,43 @@
 -}
 module Bene.Pango where
 
-import Data.Text (Text)
-import qualified Data.Text as T
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 
 data FontFamily = NormalFamily | SansFamily | SerifFamily | MonospaceFamily
 
 instance Show FontFamily where
-  show NormalFamily = "normal"
-  show SansFamily = "sans"
-  show SerifFamily = "serif"
+  show NormalFamily    = "normal"
+  show SansFamily      = "sans"
+  show SerifFamily     = "serif"
   show MonospaceFamily = "monospace"
 
-data FontSize =  
-    SizeXXSmall 
-  | SizeXSmall 
-  | SizeSmall 
-  | SizeMedium 
-  | SizeLarge 
-  | SizeXLarge 
+data FontSize =
+    SizeXXSmall
+  | SizeXSmall
+  | SizeSmall
+  | SizeMedium
+  | SizeLarge
+  | SizeXLarge
   | SizeXXLarge
 
 instance Show FontSize where
   show SizeXXSmall = "xx-small"
-  show SizeXSmall = "x-small"
-  show SizeSmall = "small"
-  show SizeMedium = "medium"
-  show SizeLarge = "large"
-  show SizeXLarge = "x-large"
+  show SizeXSmall  = "x-small"
+  show SizeSmall   = "small"
+  show SizeMedium  = "medium"
+  show SizeLarge   = "large"
+  show SizeXLarge  = "x-large"
   show SizeXXLarge = "xx-large"
 
-data FontStyle = NormalStyle | ObliqueStyle | ItalicStyle 
+data FontStyle = NormalStyle | ObliqueStyle | ItalicStyle
 
 instance Show FontStyle where
-  show NormalStyle = "normal"
+  show NormalStyle  = "normal"
   show ObliqueStyle = "oblique"
-  show ItalicStyle = "italic"
+  show ItalicStyle  = "italic"
 
-data UnderlineStyle = 
+data UnderlineStyle =
     SingleUnderline
   | DoubleUnderline
   | LowUnderline
@@ -53,8 +53,8 @@ data UnderlineStyle =
 instance Show UnderlineStyle where
   show SingleUnderline = "single"
   show DoubleUnderline = "double"
-  show LowUnderline = "low"
-  show NoUnderline = "none"
+  show LowUnderline    = "low"
+  show NoUnderline     = "none"
 
 data FontWeight =
     UltraLightWeight
@@ -66,38 +66,39 @@ data FontWeight =
 
 instance Show FontWeight where
   show UltraLightWeight = "ultralight"
-  show LightWeight = "light"
-  show NormalWeight = "normal"
-  show BoldWeight = "bold"
-  show UltraBoldWeight = "ultrabold"
-  show HeavyWeight = "heavy"
+  show LightWeight      = "light"
+  show NormalWeight     = "normal"
+  show BoldWeight       = "bold"
+  show UltraBoldWeight  = "ultrabold"
+  show HeavyWeight      = "heavy"
 
-data Attribute = 
-    FontDesc String 
+data Attribute =
+    FontDesc String
   | Family FontFamily
   | Size FontSize
   | Style FontStyle
   | Weight FontWeight
-  | Foreground String 
+  | Foreground String
   | Background String
   | Underline UnderlineStyle
   | Strikethrough
 
 instance Show Attribute where
-  show (FontDesc t) = "font_desc=\"" ++ t ++ "\""
-  show (Family f) = "font_family=\"" ++ show f ++ "\""
-  show (Size s) = "size=\"" ++ show s ++ "\""
-  show (Style s) = "style=\"" ++ show s ++ "\""
-  show (Weight w) = "weight=\"" ++ show w ++ "\""
+  show (FontDesc   t) = "font_desc=\"" ++ t ++ "\""
+  show (Family     f) = "font_family=\"" ++ show f ++ "\""
+  show (Size       s) = "size=\"" ++ show s ++ "\""
+  show (Style      s) = "style=\"" ++ show s ++ "\""
+  show (Weight     w) = "weight=\"" ++ show w ++ "\""
   show (Foreground s) = "foreground=\"" ++ s ++ "\""
   show (Background s) = "background=\"" ++ s ++ "\""
-  show (Underline u) = "underline=\"" ++ show u ++ "\""
-  show Strikethrough = "strikethrough=\"true\""
+  show (Underline  u) = "underline=\"" ++ show u ++ "\""
+  show Strikethrough  = "strikethrough=\"true\""
 
 -- | Wraps a given Text value in a span tag with the list of Attributes applied.
 span :: [Attribute] -> Text -> Text
-span [] body         = T.concat ["<span>", body, "</span>"]
+span []         body = T.concat ["<span>", body, "</span>"]
 span attributes body = T.concat [opening, body, closing]
-  where opening = T.concat ["<span ", attrs, ">"]
-        closing = "</span>"
-        attrs = T.pack $ unwords $ map show attributes
+ where
+  opening = T.concat ["<span ", attrs, ">"]
+  closing = "</span>"
+  attrs   = T.pack $ unwords $ map show attributes

@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {- |
  Module : Bene.Renderer
  Description : Renders CMark node trees as GTK widgets.
@@ -9,18 +8,28 @@
 
 module Bene.Renderer where
 
-import qualified Data.ByteString as BS
+import qualified Data.ByteString               as BS
 
-import Data.Text (Text)
-import qualified Data.Text.Encoding as T
+import           Data.Text                      ( Text )
+import qualified Data.Text.Encoding            as T
 
-import CMarkGFM
-import qualified Data.Text as T
-import qualified Bene.Pango as P
+import           CMarkGFM
+import qualified Data.Text                     as T
+import qualified Bene.Pango                    as P
 
-pangoify :: Node -> Text
-pangoify (Node _ (HEADING lvl) children) = P.span [P.Size P.SizeXXLarge] $ T.concat $ map pangoify children
-pangoify (Node _ (TEXT text) _) = text
+commonmarkToPango :: Node -> Text
+commonmarkToPango (Node _ STRONG children) =
+    strong $ T.concat $ map commonmarkToPango children
+commonmarkToPango (Node _ EMPH children) =
+    emph $ T.concat $ map commonmarkToPango children
+commonmarkToPango (Node _ (TEXT t) _) = t
+
+-- | Apply emphasis to some text using Pango Markup.
+emph :: Text -> Text
+emph = P.span [P.Style P.ItalicStyle]
+
+strong :: Text -> Text
+strong = P.span [P.Weight P.BoldWeight]
 
 parse :: Text -> Node
 parse = commonmarkToNode [] []

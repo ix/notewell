@@ -15,7 +15,7 @@ import qualified GI.Gtk                        as Gtk
 import qualified Data.ByteString.Char8         as BS
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
-import Bene.Renderer (bytes)
+import           Bene.Renderer                  ( bytes )
 import           Paths_bene
 
 data State = Welcome | FileSelection | Blank | Editing (IO Gtk.TextBuffer)
@@ -57,16 +57,15 @@ view' s =
         FileSelection -> widget
           Gtk.FileChooserWidget
           [onM #fileActivated (fmap FileSelected . Gtk.fileChooserGetFilename)]
-        Blank -> bin Gtk.ScrolledWindow []
-          $ widget
-              Gtk.TextView
-              [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
-        Editing buffer -> bin Gtk.ScrolledWindow [] $ widget
-          Gtk.TextView
-          [ afterCreated $ \tv -> Gtk.textViewSetBuffer tv . Just =<< buffer
-          , #wrapMode := Gtk.WrapModeWord
-          , classes ["editor"]
-          ]
+        Blank -> bin Gtk.ScrolledWindow [] $ editor Nothing
+        Editing buffer -> bin Gtk.ScrolledWindow [] $ editor (Just buffer) 
+
+editor :: Maybe (IO Gtk.TextBuffer) -> Widget Event
+editor Nothing    = widget Gtk.TextView [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
+editor (Just buf) = widget Gtk.TextView [#afterCreated (\_ -> return ()), #wrapMode := Gtk.WrapModeWord, classes ["editor"]]
+          where 
+            setBuffer :: Gtk.TextView -> IO ()
+            setBuffer tv = Gtk.textViewSetBuffer tv . Just =<< buf
 
 expandableChild :: Widget a -> BoxChild a
 expandableChild =
