@@ -62,7 +62,7 @@ view' s =
 
 editor :: Maybe (IO Gtk.TextBuffer) -> Widget Event
 editor Nothing    = widget Gtk.TextView [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
-editor (Just buf) = widget Gtk.TextView [#afterCreated (\_ -> return ()), #wrapMode := Gtk.WrapModeWord, classes ["editor"]]
+editor (Just buf) = widget Gtk.TextView [afterCreated setBuffer, #wrapMode := Gtk.WrapModeWord, classes ["editor"]]
           where 
             setBuffer :: Gtk.TextView -> IO ()
             setBuffer tv = Gtk.textViewSetBuffer tv . Just =<< buf
