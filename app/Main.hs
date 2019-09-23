@@ -60,12 +60,13 @@ view' s =
         Blank -> bin Gtk.ScrolledWindow []
           $ widget
               Gtk.TextView
-              [#wrapMode := Gtk.WrapModeWord, classes ["editor"]]
+              [#wrapMode := Gtk.WrapModeWord, classes ["editor"], #margin := 15]
         Editing buffer -> bin Gtk.ScrolledWindow [] $ widget
           Gtk.TextView
           [ afterCreated $ \tv -> Gtk.textViewSetBuffer tv . Just =<< buffer
           , #wrapMode := Gtk.WrapModeWord
           , classes ["editor"]
+          , #margin := 15
           ]
 
 expandableChild :: Widget a -> BoxChild a

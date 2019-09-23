@@ -16,13 +16,12 @@
     background: @accent_color;
 }
 
-scrolledwindow {
+decoration {
     background: @bg_color;
 }
 
 .editor {
     font-family: "Lato", serif; 
-    padding: 0.75rem;
     font-size: 1.5em;
     background: @bg_color;
     caret-color: @accent_color;
