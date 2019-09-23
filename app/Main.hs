@@ -29,6 +29,14 @@ bufferFromFile filename = do
   Gtk.textBufferSetText buffer contents $ fromIntegral $ bytes contents
   return buffer
 
+markdownFileFilter :: IO Gtk.FileFilter
+markdownFileFilter = do
+  filt <- Gtk.fileFilterNew
+  Gtk.fileFilterSetName filt $ Just "Markdown documents"
+  Gtk.fileFilterAddMimeType filt "text/markdown"
+  Gtk.fileFilterAddMimeType filt "text/x-markdown"
+  return filt
+
 view' :: State -> AppView Gtk.Window Event
 view' s =
   bin
@@ -56,16 +64,24 @@ view' s =
               ]
         FileSelection -> widget
           Gtk.FileChooserWidget
-          [onM #fileActivated (fmap FileSelected . Gtk.fileChooserGetFilename)]
-        Blank -> bin Gtk.ScrolledWindow [] $ editor Nothing
-        Editing buffer -> bin Gtk.ScrolledWindow [] $ editor (Just buffer) 
+          [ afterCreated $ \fc -> Gtk.fileChooserAddFilter fc =<< markdownFileFilter
+          , onM #fileActivated (fmap FileSelected . Gtk.fileChooserGetFilename)
+          ]
+        Blank          -> bin Gtk.ScrolledWindow [] $ editor Nothing
+        Editing buffer -> bin Gtk.ScrolledWindow [] $ editor (Just buffer)
 
 editor :: Maybe (IO Gtk.TextBuffer) -> Widget Event
-editor Nothing    = widget Gtk.TextView [#wrapMode := Gtk.WrapModeWord, #margin := 10, classes ["editor"]]
-editor (Just buf) = widget Gtk.TextView [afterCreated setBuffer, #wrapMode := Gtk.WrapModeWord, #margin := 10, classes ["editor"]]
-          where 
-            setBuffer :: Gtk.TextView -> IO ()
-            setBuffer tv = Gtk.textViewSetBuffer tv . Just =<< buf
+editor Nothing = widget
+  Gtk.TextView
+  [#wrapMode := Gtk.WrapModeWord, #margin := 10, classes ["editor"]]
+editor (Just buf) = widget
+  Gtk.TextView
+  [ afterCreated setBuffer
+  , #wrapMode := Gtk.WrapModeWord
+  , #margin := 10
+  , classes ["editor"]
+  ]
+  where setBuffer tv = Gtk.textViewSetBuffer tv . Just =<< buf
 
 expandableChild :: Widget a -> BoxChild a
 expandableChild =
