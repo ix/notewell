@@ -9,18 +9,21 @@ import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
 import qualified Data.Text.Encoding            as T
 import           Control.Monad
+import           Control.Applicative
 import           Control.Concurrent.Async       ( async )
 import qualified GI.Gdk                        as Gdk
 import qualified GI.Gtk                        as Gtk
 import qualified Data.ByteString.Char8         as BS
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
-import           Bene.Renderer                  ( bytes )
+import           Bene.Renderer                  ( commonmarkToPango
+                                                , bytes
+                                                )
 import           Paths_bene
 
 data State = Welcome | FileSelection | Blank | Editing (IO Gtk.TextBuffer)
 
-data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument
+data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument | Typed
 
 bufferFromFile :: FilePath -> IO Gtk.TextBuffer
 bufferFromFile filename = do
@@ -64,7 +67,8 @@ view' s =
               ]
         FileSelection -> widget
           Gtk.FileChooserWidget
-          [ afterCreated $ \fc -> Gtk.fileChooserAddFilter fc =<< markdownFileFilter
+          [ afterCreated
+            $ \fc -> Gtk.fileChooserAddFilter fc =<< markdownFileFilter
           , onM #fileActivated (fmap FileSelected . Gtk.fileChooserGetFilename)
           ]
         Blank          -> bin Gtk.ScrolledWindow [] $ editor Nothing
@@ -77,11 +81,27 @@ editor Nothing = widget
 editor (Just buf) = widget
   Gtk.TextView
   [ afterCreated setBuffer
+  , onM #selectAll (\_ tv -> (dumpPango =<< Gtk.textViewGetBuffer tv) >> return Typed)
   , #wrapMode := Gtk.WrapModeWord
   , #margin := 10
   , classes ["editor"]
   ]
-  where setBuffer tv = Gtk.textViewSetBuffer tv . Just =<< buf
+ where
+  setBuffer tv = Gtk.textViewSetBuffer tv . Just =<< buf
+
+dumpPango :: Gtk.TextBuffer -> IO ()
+dumpPango buf = do
+  txt <- Gtk.getTextBufferText buf
+  case txt of
+    Just t -> do
+      let pangoMarkup = commonmarkToPango t
+      startIter <- Gtk.textBufferGetStartIter buf
+      endIter   <- Gtk.textBufferGetEndIter buf
+      Gtk.textBufferDelete buf startIter endIter
+      Gtk.textBufferInsertMarkup buf startIter pangoMarkup
+        $ fromIntegral
+        $ bytes pangoMarkup
+    Nothing -> return ()
 
 expandableChild :: Widget a -> BoxChild a
 expandableChild =
@@ -93,6 +113,7 @@ update' _ (FileSelected (Just file)) =
 update' s (FileSelected Nothing) = Transition s (return Nothing)
 update' _ NewDocument            = Transition Blank (return Nothing)
 update' _ OpenDocument           = Transition FileSelection (return Nothing)
+update' s Typed                  = Transition s (return Nothing)
 update' _ Closed                 = Exit
 
 main :: IO ()

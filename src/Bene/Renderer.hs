@@ -17,12 +17,13 @@ import           CMarkGFM
 import qualified Data.Text                     as T
 import qualified Bene.Pango                    as P
 
-commonmarkToPango :: Node -> Text
-commonmarkToPango (Node _ STRONG children) =
-    strong $ T.concat $ map commonmarkToPango children
-commonmarkToPango (Node _ EMPH children) =
-    emph $ T.concat $ map commonmarkToPango children
-commonmarkToPango (Node _ (TEXT t) _) = t
+nodeToPango :: Node -> Text
+nodeToPango (Node _ STRONG children) =
+    strong $ T.concat $ map nodeToPango children
+nodeToPango (Node _ EMPH children) =
+    emph $ T.concat $ map nodeToPango children
+nodeToPango (Node _ (TEXT t) _) = t
+nodeToPango (Node _ _ children) = T.concat $ map nodeToPango children
 
 -- | Apply emphasis to some text using Pango Markup.
 emph :: Text -> Text
@@ -31,8 +32,8 @@ emph = P.span [P.Style P.ItalicStyle]
 strong :: Text -> Text
 strong = P.span [P.Weight P.BoldWeight]
 
-parse :: Text -> Node
-parse = commonmarkToNode [] []
+commonmarkToPango :: Text -> Text 
+commonmarkToPango = nodeToPango . commonmarkToNode [] []
 
 bytes :: Text -> Int
 bytes = BS.length . T.encodeUtf8
