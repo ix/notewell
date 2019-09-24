@@ -9,7 +9,6 @@ import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
 import qualified Data.Text.Encoding            as T
 import           Control.Monad
-import           Control.Applicative
 import           Control.Concurrent.Async       ( async )
 import qualified GI.Gdk                        as Gdk
 import qualified GI.Gtk                        as Gtk
@@ -21,16 +20,19 @@ import           Bene.Renderer                  ( commonmarkToPango
                                                 )
 import           Paths_bene
 
-data State = Welcome | FileSelection | Blank | Editing (IO Gtk.TextBuffer)
+data State = Welcome | FileSelection | Editing (IO Gtk.TextBuffer)
 
 data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument | Typed
 
-bufferFromFile :: FilePath -> IO Gtk.TextBuffer
-bufferFromFile filename = do
-  buffer   <- Gtk.textBufferNew Gtk.noTextTagTable
-  contents <- T.readFile filename
-  Gtk.textBufferSetText buffer contents $ fromIntegral $ bytes contents
-  return buffer
+createBuffer :: Maybe FilePath -> IO Gtk.TextBuffer 
+createBuffer maybeFile = do
+  buffer <- Gtk.textBufferNew Gtk.noTextTagTable
+  case maybeFile of
+    Nothing -> return buffer
+    Just filepath -> do
+      contents <- T.readFile filepath
+      Gtk.textBufferSetText buffer contents $ fromIntegral $ bytes contents
+      return buffer
 
 markdownFileFilter :: IO Gtk.FileFilter
 markdownFileFilter = do
@@ -71,14 +73,10 @@ view' s =
             $ \fc -> Gtk.fileChooserAddFilter fc =<< markdownFileFilter
           , onM #fileActivated (fmap FileSelected . Gtk.fileChooserGetFilename)
           ]
-        Blank          -> bin Gtk.ScrolledWindow [] $ editor Nothing
-        Editing buffer -> bin Gtk.ScrolledWindow [] $ editor (Just buffer)
+        Editing buffer -> bin Gtk.ScrolledWindow [] $ editor buffer
 
-editor :: Maybe (IO Gtk.TextBuffer) -> Widget Event
-editor Nothing = widget
-  Gtk.TextView
-  [#wrapMode := Gtk.WrapModeWord, #margin := 10, classes ["editor"]]
-editor (Just buf) = widget
+editor :: IO Gtk.TextBuffer -> Widget Event
+editor buffer = widget
   Gtk.TextView
   [ afterCreated setBuffer
   , onM #selectAll (\_ tv -> (dumpPango =<< Gtk.textViewGetBuffer tv) >> return Typed)
@@ -86,8 +84,7 @@ editor (Just buf) = widget
   , #margin := 10
   , classes ["editor"]
   ]
- where
-  setBuffer tv = Gtk.textViewSetBuffer tv . Just =<< buf
+  where setBuffer tv = Gtk.textViewSetBuffer tv . Just =<< buffer
 
 dumpPango :: Gtk.TextBuffer -> IO ()
 dumpPango buf = do
@@ -108,10 +105,9 @@ expandableChild =
   BoxChild defaultBoxChildProperties { expand = True, fill = True }
 
 update' :: State -> Event -> Transition State Event
-update' _ (FileSelected (Just file)) =
-  Transition (Editing $ bufferFromFile file) (return Nothing)
+update' _ (FileSelected (Just file)) = Transition (Editing $ createBuffer $ Just file) (return Nothing)
 update' s (FileSelected Nothing) = Transition s (return Nothing)
-update' _ NewDocument            = Transition Blank (return Nothing)
+update' _ NewDocument            = Transition (Editing $ createBuffer Nothing) (return Nothing)
 update' _ OpenDocument           = Transition FileSelection (return Nothing)
 update' s Typed                  = Transition s (return Nothing)
 update' _ Closed                 = Exit
