@@ -24,6 +24,9 @@ data State = Welcome | FileSelection | Editing (IO Gtk.TextBuffer)
 
 data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument | Typed
 
+-- | Create a TextBuffer from an optional filepath.
+-- If one is provided, the buffer is populated
+-- with the file's contents.
 createBuffer :: Maybe FilePath -> IO Gtk.TextBuffer 
 createBuffer maybeFile = do
   buffer <- Gtk.textBufferNew Gtk.noTextTagTable
@@ -34,6 +37,7 @@ createBuffer maybeFile = do
       Gtk.textBufferSetText buffer contents $ fromIntegral $ bytes contents
       return buffer
 
+-- | Constructs a FileFilter which pertains to Markdown documents.
 markdownFileFilter :: IO Gtk.FileFilter
 markdownFileFilter = do
   filt <- Gtk.fileFilterNew
@@ -41,6 +45,39 @@ markdownFileFilter = do
   Gtk.fileFilterAddMimeType filt "text/markdown"
   Gtk.fileFilterAddMimeType filt "text/x-markdown"
   return filt
+
+-- | Create a TextView widget from a given TextBuffer.
+editor :: IO Gtk.TextBuffer -> Widget Event
+editor buffer = widget
+  Gtk.TextView
+  [ afterCreated setBuffer
+  , onM #selectAll (\_ tv -> (dumpPango =<< Gtk.textViewGetBuffer tv) >> return Typed)
+  , #wrapMode := Gtk.WrapModeWord
+  , #margin := 10
+  , classes ["editor"]
+  ]
+  where setBuffer tv = Gtk.textViewSetBuffer tv . Just =<< buffer
+
+-- | Convert the contents of a buffer from Markdown to 
+-- Pango Markup and replace the buffer.
+dumpPango :: Gtk.TextBuffer -> IO ()
+dumpPango buf = do
+  txt <- Gtk.getTextBufferText buf
+  case txt of
+    Just t -> do
+      let pangoMarkup = commonmarkToPango t
+      startIter <- Gtk.textBufferGetStartIter buf
+      endIter   <- Gtk.textBufferGetEndIter buf
+      Gtk.textBufferDelete buf startIter endIter
+      Gtk.textBufferInsertMarkup buf startIter pangoMarkup
+        $ fromIntegral
+        $ bytes pangoMarkup
+    Nothing -> return ()
+
+-- | Place a widget inside a BoxChild and allow it to expand.
+expandableChild :: Widget a -> BoxChild a
+expandableChild =
+  BoxChild defaultBoxChildProperties { expand = True, fill = True }
 
 view' :: State -> AppView Gtk.Window Event
 view' s =
@@ -74,35 +111,6 @@ view' s =
           , onM #fileActivated (fmap FileSelected . Gtk.fileChooserGetFilename)
           ]
         Editing buffer -> bin Gtk.ScrolledWindow [] $ editor buffer
-
-editor :: IO Gtk.TextBuffer -> Widget Event
-editor buffer = widget
-  Gtk.TextView
-  [ afterCreated setBuffer
-  , onM #selectAll (\_ tv -> (dumpPango =<< Gtk.textViewGetBuffer tv) >> return Typed)
-  , #wrapMode := Gtk.WrapModeWord
-  , #margin := 10
-  , classes ["editor"]
-  ]
-  where setBuffer tv = Gtk.textViewSetBuffer tv . Just =<< buffer
-
-dumpPango :: Gtk.TextBuffer -> IO ()
-dumpPango buf = do
-  txt <- Gtk.getTextBufferText buf
-  case txt of
-    Just t -> do
-      let pangoMarkup = commonmarkToPango t
-      startIter <- Gtk.textBufferGetStartIter buf
-      endIter   <- Gtk.textBufferGetEndIter buf
-      Gtk.textBufferDelete buf startIter endIter
-      Gtk.textBufferInsertMarkup buf startIter pangoMarkup
-        $ fromIntegral
-        $ bytes pangoMarkup
-    Nothing -> return ()
-
-expandableChild :: Widget a -> BoxChild a
-expandableChild =
-  BoxChild defaultBoxChildProperties { expand = True, fill = True }
 
 update' :: State -> Event -> Transition State Event
 update' _ (FileSelected (Just file)) = Transition (Editing $ createBuffer $ Just file) (return Nothing)
