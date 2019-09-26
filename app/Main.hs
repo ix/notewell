@@ -27,11 +27,11 @@ data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument
 -- | Create a TextBuffer from an optional filepath.
 -- If one is provided, the buffer is populated
 -- with the file's contents.
-createBuffer :: Maybe FilePath -> IO Gtk.TextBuffer 
+createBuffer :: Maybe FilePath -> IO Gtk.TextBuffer
 createBuffer maybeFile = do
   buffer <- Gtk.textBufferNew Gtk.noTextTagTable
   case maybeFile of
-    Nothing -> return buffer
+    Nothing       -> return buffer
     Just filepath -> do
       contents <- T.readFile filepath
       Gtk.textBufferSetText buffer contents $ fromIntegral $ bytes contents
@@ -51,7 +51,8 @@ editor :: IO Gtk.TextBuffer -> Widget Event
 editor buffer = widget
   Gtk.TextView
   [ afterCreated setBuffer
-  , onM #selectAll (\_ tv -> (dumpPango =<< Gtk.textViewGetBuffer tv) >> return Typed)
+  , onM #selectAll
+        (\_ tv -> (dumpPango =<< Gtk.textViewGetBuffer tv) >> return Typed)
   , #wrapMode := Gtk.WrapModeWord
   , #margin := 10
   , classes ["editor"]
@@ -113,12 +114,14 @@ view' s =
         Editing buffer -> bin Gtk.ScrolledWindow [] $ editor buffer
 
 update' :: State -> Event -> Transition State Event
-update' _ (FileSelected (Just file)) = Transition (Editing $ createBuffer $ Just file) (return Nothing)
+update' _ (FileSelected (Just file)) =
+  Transition (Editing $ createBuffer $ Just file) (return Nothing)
 update' s (FileSelected Nothing) = Transition s (return Nothing)
-update' _ NewDocument            = Transition (Editing $ createBuffer Nothing) (return Nothing)
-update' _ OpenDocument           = Transition FileSelection (return Nothing)
-update' s Typed                  = Transition s (return Nothing)
-update' _ Closed                 = Exit
+update' _ NewDocument =
+  Transition (Editing $ createBuffer Nothing) (return Nothing)
+update' _ OpenDocument = Transition FileSelection (return Nothing)
+update' s Typed        = Transition s (return Nothing)
+update' _ Closed       = Exit
 
 main :: IO ()
 main = do
