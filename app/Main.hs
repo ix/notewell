@@ -30,6 +30,7 @@ data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument
 createBuffer :: Maybe FilePath -> IO Gtk.TextBuffer
 createBuffer maybeFile = do
   buffer <- Gtk.textBufferNew Gtk.noTextTagTable
+  Gtk.on buffer #endUserAction (dumpPango buffer)
   case maybeFile of
     Nothing       -> return buffer
     Just filepath -> do
@@ -51,8 +52,6 @@ editor :: IO Gtk.TextBuffer -> Widget Event
 editor buffer = widget
   Gtk.TextView
   [ afterCreated setBuffer
-  , onM #selectAll
-        (\_ tv -> (dumpPango =<< Gtk.textViewGetBuffer tv) >> return Typed)
   , #wrapMode := Gtk.WrapModeWord
   , #margin := 10
   , classes ["editor"]
@@ -63,17 +62,12 @@ editor buffer = widget
 -- Pango Markup and replace the buffer.
 dumpPango :: Gtk.TextBuffer -> IO ()
 dumpPango buf = do
-  txt <- Gtk.getTextBufferText buf
-  case txt of
-    Just t -> do
-      let pangoMarkup = commonmarkToPango t
-      startIter <- Gtk.textBufferGetStartIter buf
-      endIter   <- Gtk.textBufferGetEndIter buf
-      Gtk.textBufferDelete buf startIter endIter
-      Gtk.textBufferInsertMarkup buf startIter pangoMarkup
-        $ fromIntegral
-        $ bytes pangoMarkup
-    Nothing -> return ()
+  s   <- Gtk.textBufferGetStartIter buf
+  e   <- Gtk.textBufferGetEndIter buf
+  txt <- Gtk.textBufferGetText buf s e False
+  let pangoMarkup = commonmarkToPango txt
+  Gtk.textBufferDelete buf s e 
+  Gtk.textBufferInsertMarkup buf s pangoMarkup $ fromIntegral $ bytes pangoMarkup
 
 -- | Place a widget inside a BoxChild and allow it to expand.
 expandableChild :: Widget a -> BoxChild a
@@ -127,7 +121,7 @@ main :: IO ()
 main = do
   void $ Gtk.init Nothing
 
-  path     <- T.pack <$> getDataFileName "themes/giorno/giorno.css"
+  path     <- T.pack <$> getDataFileName "themes/textbook/textbook.css"
 
   screen   <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
   provider <- Gtk.cssProviderNew

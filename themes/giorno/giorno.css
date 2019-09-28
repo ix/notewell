@@ -20,6 +20,8 @@ decoration {
     background: @bg_color;
 }
 
+scrolledwindow { background: @bg_color; }
+
 .editor {
     font-family: "Lato", serif; 
     font-size: 1.5em;

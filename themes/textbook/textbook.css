@@ -1,6 +1,6 @@
-@define-color fg_color #f8f8f8;
-@define-color accent_color #EB2F7D;
-@define-color bg_color #252526;
+@define-color bg_color #FFF8EA;
+@define-color accent_color #B35F5D;
+@define-color fg_color #240700;
 
 .intro button {
     border: none;
@@ -16,14 +16,14 @@
     background: @accent_color;
 }
 
-decoration { 
+decoration {
     background: @bg_color;
 }
 
 scrolledwindow { background: @bg_color; }
 
 .editor {
-    font-family: "Lato", serif; 
+    font-family: "Merriweather", serif;
     font-size: 1.5em;
     background: @bg_color;
     caret-color: @accent_color;
