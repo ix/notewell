@@ -15,9 +15,7 @@ import qualified GI.Gtk                        as Gtk
 import qualified Data.ByteString.Char8         as BS
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
-import           Bene.Renderer                  ( commonmarkToPango
-                                                , bytes
-                                                )
+import           Bene.Renderer
 import           Paths_bene
 
 data State = Welcome | FileSelection | Editing (IO Gtk.TextBuffer)
@@ -29,8 +27,8 @@ data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument
 -- with the file's contents.
 createBuffer :: Maybe FilePath -> IO Gtk.TextBuffer
 createBuffer maybeFile = do
-  buffer <- Gtk.textBufferNew Gtk.noTextTagTable
-  Gtk.on buffer #endUserAction (dumpPango buffer)
+  buffer <- Gtk.textBufferNew . Just =<< markdownTextTagTable
+  Gtk.on buffer #endUserAction (renderMarkdown buffer)
   case maybeFile of
     Nothing       -> return buffer
     Just filepath -> do
@@ -58,16 +56,16 @@ editor buffer = widget
   ]
   where setBuffer tv = Gtk.textViewSetBuffer tv . Just =<< buffer
 
--- | Convert the contents of a buffer from Markdown to 
--- Pango Markup and replace the buffer.
-dumpPango :: Gtk.TextBuffer -> IO ()
-dumpPango buf = do
-  s   <- Gtk.textBufferGetStartIter buf
-  e   <- Gtk.textBufferGetEndIter buf
-  txt <- Gtk.textBufferGetText buf s e False
-  let pangoMarkup = commonmarkToPango txt
-  Gtk.textBufferDelete buf s e 
-  Gtk.textBufferInsertMarkup buf s pangoMarkup $ fromIntegral $ bytes pangoMarkup
+-- | Render Markdown based on the content of a TextBuffer.
+renderMarkdown :: Gtk.TextBuffer -> IO ()
+renderMarkdown buffer = clearTags buffer >> formatBuffer buffer
+
+-- | Remove all TextTags from a buffer.
+clearTags :: Gtk.TextBuffer -> IO ()
+clearTags buffer = do
+  s <- Gtk.textBufferGetStartIter buffer
+  e <- Gtk.textBufferGetEndIter buffer
+  Gtk.textBufferRemoveAllTags buffer s e
 
 -- | Place a widget inside a BoxChild and allow it to expand.
 expandableChild :: Widget a -> BoxChild a
