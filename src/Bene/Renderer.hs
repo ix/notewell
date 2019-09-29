@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 {- |
  Module : Bene.Renderer
  Description : Renders CMark node trees as GTK widgets.
@@ -30,10 +31,11 @@ applyTag buffer (PosInfo sl' sc' el' ec') tag = do
   e <- Gtk.textBufferGetIterAtLineOffset buffer el ec
   Gtk.textBufferApplyTagByName buffer tag s e
   return ()
-  where sl = fromIntegral $ pred sl'
-        sc = fromIntegral $ pred sc'
-        el = fromIntegral $ pred el'
-        ec = fromIntegral $ ec'
+ where
+  sl = fromIntegral $ pred sl'
+  sc = fromIntegral $ pred sc'
+  el = fromIntegral $ pred el'
+  ec = fromIntegral $ ec'
 
 -- | Traverses a Node and applies formatting tags to a buffer accordingly.
 applyNode :: Gtk.TextBuffer -> Node -> IO ()
@@ -43,21 +45,43 @@ applyNode buffer (Node (Just pos) EMPH children) = do
 applyNode buffer (Node (Just pos) STRONG children) = do
   applyTag buffer pos "strong"
   mapM_ (applyNode buffer) children
-applyNode _ (Node _ (TEXT t) _) = return ()
-applyNode buffer (Node _ _ children) = mapM_ (applyNode buffer) children
+applyNode buffer (Node (Just pos) (CODE t) _) = applyTag buffer pos "code"
+applyNode buffer (Node (Just pos) (CODE_BLOCK _ t) _) =
+  applyTag buffer pos "codeblock"
+applyNode buffer (Node (Just pos) (HEADING level) children) = do
+  applyTag buffer pos $ T.concat ["heading", T.pack $ show level]
+  mapM_ (applyNode buffer) children
+applyNode _      (Node _ (TEXT t) _       ) = return ()
+applyNode buffer (Node _ _        children) = mapM_ (applyNode buffer) children
 
+-- | Parse the Markdown contained in a TextBuffer to a Node tree
+-- and proceed to render it using TextTags.
 formatBuffer :: Gtk.TextBuffer -> IO ()
 formatBuffer buffer = do
-  s <- Gtk.textBufferGetStartIter buffer 
-  e <- Gtk.textBufferGetEndIter buffer
+  s       <- Gtk.textBufferGetStartIter buffer
+  e       <- Gtk.textBufferGetEndIter buffer
   content <- Gtk.textBufferGetText buffer s e True
   applyNode buffer (commonmarkToNode [] [] content)
 
+-- | Build a TextTagTable from our TextTags.
+-- Note that Markdown uses HTML headings, and so exactly six levels h1-h6.
 markdownTextTagTable :: IO Gtk.TextTagTable
 markdownTextTagTable = do
   table <- Gtk.textTagTableNew
-  mapM_ (Gtk.textTagTableAdd table =<<) [emph, strong]
+  mapM_ (Gtk.textTagTableAdd table =<<) tags
   return table
+  where tags = [emph, strong, code, codeBlock] ++ map heading [1 .. 6]
+
+heading :: Int -> IO Gtk.TextTag
+heading level = do
+  tag <- Gtk.textTagNew $ Just $ T.concat ["heading", T.pack $ show level]
+  Gtk.setTextTagScale tag $ if
+    | level <= 1 -> 2
+    | level == 2 -> 1.75
+    | level == 3 -> 1.5
+    | level == 4 -> 1.25
+    | level >= 5 -> 1
+  return tag
 
 emph :: IO Gtk.TextTag
 emph = do
@@ -69,6 +93,18 @@ strong :: IO Gtk.TextTag
 strong = do
   tag <- Gtk.textTagNew $ Just "strong"
   Gtk.setTextTagWeight tag $ fromIntegral $ fromEnum Pango.WeightBold
+  return tag
+
+code :: IO Gtk.TextTag
+code = do
+  tag <- Gtk.textTagNew $ Just "code"
+  Gtk.setTextTagFamily tag "monospace"
+  return tag
+
+codeBlock :: IO Gtk.TextTag
+codeBlock = do
+  tag <- Gtk.textTagNew $ Just "codeblock"
+  Gtk.setTextTagFamily tag "monospace"
   return tag
 
 bytes :: Text -> Int
