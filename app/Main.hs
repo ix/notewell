@@ -43,6 +43,7 @@ markdownFileFilter = do
   Gtk.fileFilterSetName filt $ Just "Markdown documents"
   Gtk.fileFilterAddMimeType filt "text/markdown"
   Gtk.fileFilterAddMimeType filt "text/x-markdown"
+  Gtk.fileFilterAddPattern filt "**/*.{markdown,md}"
   return filt
 
 -- | Create a TextView widget from a given TextBuffer.
@@ -119,7 +120,7 @@ main :: IO ()
 main = do
   void $ Gtk.init Nothing
 
-  path     <- T.pack <$> getDataFileName "themes/textbook/textbook.css"
+  path     <- T.pack <$> getDataFileName "themes/giorno/giorno.css"
 
   screen   <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
   provider <- Gtk.cssProviderNew
