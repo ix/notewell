@@ -51,6 +51,9 @@ applyNode buffer (Node (Just pos) (CODE_BLOCK _ t) _) =
 applyNode buffer (Node (Just pos) (HEADING level) children) = do
   applyTag buffer pos $ T.concat ["heading", T.pack $ show level]
   mapM_ (applyNode buffer) children
+applyNode buffer (Node (Just pos) STRIKETHROUGH children) = do
+  applyTag buffer pos "strikethrough"
+  mapM_ (applyNode buffer) children
 applyNode _      (Node _ (TEXT t) _       ) = return ()
 applyNode buffer (Node _ _        children) = mapM_ (applyNode buffer) children
 
@@ -61,7 +64,7 @@ formatBuffer buffer = do
   s       <- Gtk.textBufferGetStartIter buffer
   e       <- Gtk.textBufferGetEndIter buffer
   content <- Gtk.textBufferGetText buffer s e True
-  applyNode buffer (commonmarkToNode [] [] content)
+  applyNode buffer (commonmarkToNode [] [extStrikethrough] content)
 
 -- | Build a TextTagTable from our TextTags.
 -- Note that Markdown uses HTML headings, and so exactly six levels h1-h6.
@@ -70,7 +73,8 @@ markdownTextTagTable = do
   table <- Gtk.textTagTableNew
   mapM_ (Gtk.textTagTableAdd table =<<) tags
   return table
-  where tags = [emph, strong, code, codeBlock] ++ map heading [1 .. 6]
+ where
+  tags = [emph, strong, code, codeBlock, strikethrough] ++ map heading [1 .. 6]
 
 heading :: Int -> IO Gtk.TextTag
 heading level = do
@@ -105,6 +109,12 @@ codeBlock :: IO Gtk.TextTag
 codeBlock = do
   tag <- Gtk.textTagNew $ Just "codeblock"
   Gtk.setTextTagFamily tag "monospace"
+  return tag
+
+strikethrough :: IO Gtk.TextTag
+strikethrough = do
+  tag <- Gtk.textTagNew $ Just "strikethrough"
+  Gtk.setTextTagStrikethrough tag True
   return tag
 
 bytes :: Text -> Int
