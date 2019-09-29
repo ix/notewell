@@ -33,12 +33,15 @@ applyTag buffer (PosInfo sl' sc' el' ec') tag = do
   where sl = fromIntegral $ pred sl'
         sc = fromIntegral $ pred sc'
         el = fromIntegral $ pred el'
-        ec = fromIntegral $ pred ec'
+        ec = fromIntegral $ ec'
 
 -- | Traverses a Node and applies formatting tags to a buffer accordingly.
 applyNode :: Gtk.TextBuffer -> Node -> IO ()
 applyNode buffer (Node (Just pos) EMPH children) = do
   applyTag buffer pos "emph"
+  mapM_ (applyNode buffer) children
+applyNode buffer (Node (Just pos) STRONG children) = do
+  applyTag buffer pos "strong"
   mapM_ (applyNode buffer) children
 applyNode _ (Node _ (TEXT t) _) = return ()
 applyNode buffer (Node _ _ children) = mapM_ (applyNode buffer) children
@@ -65,7 +68,7 @@ emph = do
 strong :: IO Gtk.TextTag
 strong = do
   tag <- Gtk.textTagNew $ Just "strong"
-  Gtk.setTextTagStyle tag Pango.StyleOblique
+  Gtk.setTextTagWeight tag $ fromIntegral $ fromEnum Pango.WeightBold
   return tag
 
 bytes :: Text -> Int
