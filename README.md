@@ -1,6 +1,13 @@
-# bene
+# Bene
+Bene is a cross-platform Markdown editor written in Haskell using `gi-gtk-declarative`.
 
-# macos build instructions
+It uses `cmark-gfm` to parse Markdown blazingly fast and renders to a TextView -- so there are no browsers involved here.
+
+Bene is a __work in progress__ and so things might break or simply not be implemented at all. 
+
+Releases will be made when the software meets a criteria of basic usability.
+
+## macOS build instructions
 
 First, make sure you have installed homebrew, then follow the steps below:
 
