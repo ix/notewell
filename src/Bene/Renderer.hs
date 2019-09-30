@@ -106,12 +106,14 @@ code :: IO Gtk.TextTag
 code = do
   tag <- Gtk.textTagNew $ Just "code"
   Gtk.setTextTagFamily tag "monospace"
+  Gtk.setTextTagScale tag 0.75
   return tag
 
 codeBlock :: IO Gtk.TextTag
 codeBlock = do
   tag <- Gtk.textTagNew $ Just "codeblock"
   Gtk.setTextTagFamily tag "monospace"
+  Gtk.setTextTagScale tag 0.75
   return tag
 
 strikethrough :: IO Gtk.TextTag
