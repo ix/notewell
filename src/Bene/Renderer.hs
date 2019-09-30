@@ -54,6 +54,9 @@ applyNode buffer (Node (Just pos) (HEADING level) children) = do
 applyNode buffer (Node (Just pos) STRIKETHROUGH children) = do
   applyTag buffer pos "strikethrough"
   mapM_ (applyNode buffer) children
+applyNode buffer (Node (Just pos) THEMATIC_BREAK children) = do
+  applyTag buffer pos "thematicbreak"
+  mapM_ (applyNode buffer) children
 applyNode _      (Node _ (TEXT t) _       ) = return ()
 applyNode buffer (Node _ _        children) = mapM_ (applyNode buffer) children
 
@@ -74,7 +77,7 @@ markdownTextTagTable = do
   mapM_ (Gtk.textTagTableAdd table =<<) tags
   return table
  where
-  tags = [emph, strong, code, codeBlock, strikethrough] ++ map heading [1 .. 6]
+  tags = [emph, strong, code, codeBlock, strikethrough, thematicBreak] ++ map heading [1 .. 6]
 
 heading :: Int -> IO Gtk.TextTag
 heading level = do
@@ -115,6 +118,12 @@ strikethrough :: IO Gtk.TextTag
 strikethrough = do
   tag <- Gtk.textTagNew $ Just "strikethrough"
   Gtk.setTextTagStrikethrough tag True
+  return tag
+
+thematicBreak :: IO Gtk.TextTag
+thematicBreak = do
+  tag <- Gtk.textTagNew $ Just "thematicbreak"
+  Gtk.setTextTagJustification tag Gtk.JustificationCenter
   return tag
 
 bytes :: Text -> Int
