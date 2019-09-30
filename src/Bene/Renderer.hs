@@ -57,6 +57,12 @@ applyNode buffer (Node (Just pos) STRIKETHROUGH children) = do
 applyNode buffer (Node (Just pos) THEMATIC_BREAK children) = do
   applyTag buffer pos "thematicbreak"
   mapM_ (applyNode buffer) children
+applyNode buffer (Node (Just pos) (LIST _) children) = do
+  applyTag buffer pos "list"
+  mapM_ (applyNode buffer) children
+applyNode buffer (Node (Just pos) BLOCK_QUOTE children) = do
+  applyTag buffer pos "blockquote"
+  mapM_ (applyNode buffer) children
 applyNode _      (Node _ (TEXT t) _       ) = return ()
 applyNode buffer (Node _ _        children) = mapM_ (applyNode buffer) children
 
@@ -77,11 +83,22 @@ markdownTextTagTable = do
   mapM_ (Gtk.textTagTableAdd table =<<) tags
   return table
  where
-  tags = [emph, strong, code, codeBlock, strikethrough, thematicBreak] ++ map heading [1 .. 6]
+  tags =
+    [ emph
+      , strong
+      , code
+      , codeBlock
+      , strikethrough
+      , thematicBreak
+      , list
+      , blockquote
+      ]
+      ++ map heading [1 .. 6]
 
 heading :: Int -> IO Gtk.TextTag
 heading level = do
   tag <- Gtk.textTagNew $ Just $ T.concat ["heading", T.pack $ show level]
+  Gtk.setTextTagWeight tag $ fromIntegral $ fromEnum Pango.WeightHeavy
   Gtk.setTextTagScale tag $ if
     | level <= 1 -> 2
     | level == 2 -> 1.75
@@ -99,7 +116,7 @@ emph = do
 strong :: IO Gtk.TextTag
 strong = do
   tag <- Gtk.textTagNew $ Just "strong"
-  Gtk.setTextTagWeight tag $ fromIntegral $ fromEnum Pango.WeightBold
+  Gtk.setTextTagWeight tag $ fromIntegral $ fromEnum Pango.WeightHeavy
   return tag
 
 code :: IO Gtk.TextTag
@@ -126,6 +143,18 @@ thematicBreak :: IO Gtk.TextTag
 thematicBreak = do
   tag <- Gtk.textTagNew $ Just "thematicbreak"
   Gtk.setTextTagJustification tag Gtk.JustificationCenter
+  return tag
+
+list :: IO Gtk.TextTag
+list = do
+  tag <- Gtk.textTagNew $ Just "list"
+  Gtk.setTextTagIndent tag 30
+  return tag
+
+blockquote :: IO Gtk.TextTag
+blockquote = do
+  tag <- Gtk.textTagNew $ Just "blockquote"
+  Gtk.setTextTagVariant tag Pango.VariantSmallCaps
   return tag
 
 bytes :: Text -> Int
