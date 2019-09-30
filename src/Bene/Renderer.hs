@@ -155,6 +155,8 @@ blockquote :: IO Gtk.TextTag
 blockquote = do
   tag <- Gtk.textTagNew $ Just "blockquote"
   Gtk.setTextTagVariant tag Pango.VariantSmallCaps
+  Gtk.setTextTagStyle tag Pango.StyleItalic
+  Gtk.setTextTagIndent tag 30
   return tag
 
 bytes :: Text -> Int

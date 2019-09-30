@@ -24,9 +24,10 @@ scrolledwindow { background: @bg_color; }
 
 .editor {
     font-family: "Lato", serif; 
-    font-size: 1.5em;
+    font-size: 1.25em;
     background: @bg_color;
     caret-color: @accent_color;
+    -GtkWidget-cursor-aspect-ratio: 0.05;
 }
 
 .editor text {
