@@ -1,0 +1,47 @@
+[1mdiff --git a/app/Main.hs b/app/Main.hs[m
+[1mindex 089490d..ccca9f5 100644[m
+[1m--- a/app/Main.hs[m
+[1m+++ b/app/Main.hs[m
+[36m@@ -18,9 +18,9 @@[m [mimport           GI.Gtk.Declarative.App.Simple[m
+ import           Bene.Renderer[m
+ import           Paths_bene[m
+ [m
+[31m-data State = Welcome | FileSelection | Editing (IO Gtk.TextBuffer)[m
+[32m+[m[32mdata State = Welcome | FileSelection | Editing (IO Gtk.TextBuffer) | FileSaving[m
+ [m
+[31m-data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument | Typed[m
+[32m+[m[32mdata Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument | Typed | Saved[m
+ [m
+ -- | Create a TextBuffer from an optional filepath.[m
+ -- If one is provided, the buffer is populated[m
+[36m@@ -104,7 +104,21 @@[m [mview' s =[m
+             $ \fc -> Gtk.fileChooserAddFilter fc =<< markdownFileFilter[m
+           , onM #fileActivated (fmap FileSelected . Gtk.fileChooserGetFilename)[m
+           ][m
+[31m-        Editing buffer -> bin Gtk.ScrolledWindow [] $ editor buffer[m
+[32m+[m[32m        FileSaving ->[m
+[32m+[m[32m          widget Gtk.FileChooserWidget [#action := Gtk.FileChooserActionSave][m
+[32m+[m[32m        Editing buffer ->[m
+[32m+[m[32m          container Gtk.Box [#orientation := Gtk.OrientationVertical][m
+[32m+[m[32m            $ [ container[m
+[32m+[m[32m                Gtk.MenuBar[m
+[32m+[m[32m                [][m
+[32m+[m[32m                [ subMenu[m
+[32m+[m[32m                    "File"[m
+[32m+[m[32m                    [ menuItem Gtk.MenuItem [on #activate Saved][m
+[32m+[m[32m                        $ widget Gtk.Label [#label := "Save"][m
+[32m+[m[32m                    ][m
+[32m+[m[32m                ][m
+[32m+[m[32m              , bin Gtk.ScrolledWindow [] $ editor buffer[m
+[32m+[m[32m              ][m
+ [m
+ update' :: State -> Event -> Transition State Event[m
+ update' _ (FileSelected (Just file)) =[m
+[36m@@ -114,6 +128,7 @@[m [mupdate' _ NewDocument =[m
+   Transition (Editing $ createBuffer Nothing) (return Nothing)[m
+ update' _ OpenDocument = Transition FileSelection (return Nothing)[m
+ update' s Typed        = Transition s (return Nothing)[m
+[32m+[m[32mupdate' s Saved        = Transition FileSaving (return Nothing)[m
+ update' _ Closed       = Exit[m
+ [m
+ main :: IO ()[m

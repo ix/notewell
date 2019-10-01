@@ -18,9 +18,9 @@ import           GI.Gtk.Declarative.App.Simple
 import           Bene.Renderer
 import           Paths_bene
 
-data State = Welcome | FileSelection | Editing (IO Gtk.TextBuffer)
+data State = Welcome | FileSelection | Editing (IO Gtk.TextBuffer) | FileSaving
 
-data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument | Typed
+data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument | Typed | Saved
 
 -- | Create a TextBuffer from an optional filepath.
 -- If one is provided, the buffer is populated
@@ -104,7 +104,21 @@ view' s =
             $ \fc -> Gtk.fileChooserAddFilter fc =<< markdownFileFilter
           , onM #fileActivated (fmap FileSelected . Gtk.fileChooserGetFilename)
           ]
-        Editing buffer -> bin Gtk.ScrolledWindow [] $ editor buffer
+        FileSaving ->
+          widget Gtk.FileChooserWidget [#action := Gtk.FileChooserActionSave]
+        Editing buffer ->
+          container Gtk.Box [#orientation := Gtk.OrientationVertical]
+            $ [ container
+                Gtk.MenuBar
+                []
+                [ subMenu
+                    "File"
+                    [ menuItem Gtk.MenuItem [on #activate Saved]
+                        $ widget Gtk.Label [#label := "Save"]
+                    ]
+                ]
+              , bin Gtk.ScrolledWindow [] $ editor buffer
+              ]
 
 update' :: State -> Event -> Transition State Event
 update' _ (FileSelected (Just file)) =
@@ -114,6 +128,7 @@ update' _ NewDocument =
   Transition (Editing $ createBuffer Nothing) (return Nothing)
 update' _ OpenDocument = Transition FileSelection (return Nothing)
 update' s Typed        = Transition s (return Nothing)
+update' s Saved        = Transition FileSaving (return Nothing)
 update' _ Closed       = Exit
 
 main :: IO ()
