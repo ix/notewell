@@ -18,21 +18,20 @@ import           GI.Gtk.Declarative.App.Simple
 import           Bene.Renderer
 import           Paths_bene
 
-data State = Welcome | FileSelection | Editing (IO Gtk.TextBuffer) | FileSaving
+data State = Welcome | FileSelection | Editing (IO Text) | FileSaving (IO Text)
 
-data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument | Typed | Saved
+data Event = Closed | FileSelected (Maybe FilePath) | NewDocument | OpenDocument | Typed | Saved | SaveFileSelected (Maybe FilePath)
 
--- | Create a TextBuffer from an optional filepath.
+-- | Create a TextBuffer from an optional string.
 -- If one is provided, the buffer is populated
 -- with the file's contents.
-createBuffer :: Maybe FilePath -> IO Gtk.TextBuffer
-createBuffer maybeFile = do
+createBuffer :: Maybe Text -> IO Gtk.TextBuffer
+createBuffer maybeText = do
   buffer <- Gtk.textBufferNew . Just =<< markdownTextTagTable
   Gtk.on buffer #endUserAction (renderMarkdown buffer)
-  case maybeFile of
+  case maybeText of
     Nothing       -> return buffer
-    Just filepath -> do
-      contents <- T.readFile filepath
+    Just contents -> do
       Gtk.textBufferSetText buffer contents $ fromIntegral $ bytes contents
       return buffer
 
@@ -104,31 +103,33 @@ view' s =
             $ \fc -> Gtk.fileChooserAddFilter fc =<< markdownFileFilter
           , onM #fileActivated (fmap FileSelected . Gtk.fileChooserGetFilename)
           ]
-        FileSaving ->
-          widget Gtk.FileChooserWidget [#action := Gtk.FileChooserActionSave]
-        Editing buffer ->
+        FileSaving buffer -> widget
+          Gtk.FileChooserWidget
+          [ #action := Gtk.FileChooserActionSave
+          , onM #fileActivated (fmap SaveFileSelected . Gtk.fileChooserGetFilename)
+          ]
+        Editing content ->
           container Gtk.Box [#orientation := Gtk.OrientationVertical]
-            $ [ container
-                Gtk.MenuBar
-                []
-                [ subMenu
-                    "File"
-                    [ menuItem Gtk.MenuItem [on #activate Saved]
-                        $ widget Gtk.Label [#label := "Save"]
-                    ]
-                ]
-              , bin Gtk.ScrolledWindow [] $ editor buffer
+            $ [ expandableChild $ bin Gtk.ScrolledWindow [] $ editor $ createBuffer . Just =<< content
+              , container
+                Gtk.Box
+                [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
+                [widget Gtk.Button [#label := "Save", on #clicked Saved]]
               ]
 
 update' :: State -> Event -> Transition State Event
 update' _ (FileSelected (Just file)) =
-  Transition (Editing $ createBuffer $ Just file) (return Nothing)
-update' s (FileSelected Nothing) = Transition s (return Nothing)
+  Transition (Editing $ T.readFile file) $ return Nothing
+update' s (FileSelected Nothing) = Transition s $ return Nothing
 update' _ NewDocument =
-  Transition (Editing $ createBuffer Nothing) (return Nothing)
-update' _ OpenDocument = Transition FileSelection (return Nothing)
-update' s Typed        = Transition s (return Nothing)
-update' s Saved        = Transition FileSaving (return Nothing)
+  Transition (Editing $ return T.empty) $ return Nothing
+update' _ OpenDocument = Transition FileSelection $ return Nothing
+update' (Editing content) Saved = Transition (FileSaving content) $ return Nothing
+update' (FileSaving content) (SaveFileSelected (Just file)) = Transition (Editing content) $ do
+  T.putStrLn =<< content
+  return Nothing
+update' (FileSaving buffer) (SaveFileSelected Nothing) = Transition (Editing buffer) $ return Nothing
+update' s Typed        = Transition s $ return Nothing
 update' _ Closed       = Exit
 
 main :: IO ()
