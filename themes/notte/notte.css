@@ -28,6 +28,12 @@ scrolledwindow { background: @bg_color; }
     background: @bg_color;
     caret-color: @accent_color;
     -GtkWidget-cursor-aspect-ratio: 0.05;
+    animation: blink 0.5s ease-in-out alternate infinite;
+}
+
+@keyframes blink {
+    0% { caret-color: @accent_color; }
+    100% { caret-color: rgba(0, 0, 0, 0); }
 }
 
 .editor text {

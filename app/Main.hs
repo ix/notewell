@@ -40,6 +40,7 @@ data Event = Closed
            | SaveFileSelected (Maybe FilePath)
 
 -- | Create an empty TextBuffer.
+-- [TODO] Remove the use of `unsafePerformIO` here.
 createBuffer :: Gtk.TextBuffer
 createBuffer = unsafePerformIO $ do
   buffer <- Gtk.textBufferNew . Just =<< markdownTextTagTable
@@ -78,6 +79,7 @@ clearTags buffer = do
   e <- Gtk.textBufferGetEndIter buffer
   Gtk.textBufferRemoveAllTags buffer s e
 
+-- | Retrieve the contents of a TextBuffer.
 getBufferContents :: Gtk.TextBuffer -> IO Text
 getBufferContents buffer = do
   s <- Gtk.textBufferGetStartIter buffer
@@ -122,15 +124,29 @@ view' = do
             $ [expandableChild $ bin Gtk.ScrolledWindow [] $ editor b, expandableChild $ widget Gtk.Button [on #clicked SaveClicked]]
         Save -> widget
           Gtk.FileChooserWidget
-          [ #action := Gtk.FileChooserActionOpen
+          [ #action := Gtk.FileChooserActionSave
           , onM #fileActivated (fmap SaveFileSelected . Gtk.fileChooserGetFilename)
+          ]
+        Open -> widget
+          Gtk.FileChooserWidget
+          [ #action := Gtk.FileChooserActionOpen
+          , onM #fileActivated (fmap OpenFileSelected . Gtk.fileChooserGetFilename) 
           ]
 
 
 update' :: Luggage -> Event -> Transition Luggage Event
 update' s NewClicked                     = Transition s { screen = Editing } $ return Nothing
 update' s SaveClicked                    = Transition s { screen = Save } $ return Nothing
-update' s (SaveFileSelected (Just file)) = Transition s { screen = Editing } $ return Nothing
+update' s (SaveFileSelected (Just file)) = Transition s { screen = Editing } $ do
+  T.writeFile file =<< (getBufferContents $ buffer s)
+  return Nothing
+update' s (SaveFileSelected Nothing)     = Transition s { screen = Editing } $ return Nothing
+update' s OpenClicked                    = Transition s { screen = Open } $ return Nothing
+update' s (OpenFileSelected (Just file)) = Transition s { screen = Editing } $ do
+  contents <- T.readFile file
+  Gtk.textBufferSetText (buffer s) contents $ fromIntegral $ bytes contents
+  return Nothing
+update' s (OpenFileSelected Nothing) = Transition s { screen = Editing } $ return Nothing
 update' _ _          = Exit
 
 main :: IO ()
@@ -140,6 +156,12 @@ main = do
   path     <- T.pack <$> getDataFileName "themes/giorno/giorno.css"
   screen   <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
   provider <- Gtk.cssProviderNew
+  settings <- Gtk.settingsGetDefault
+  
+  case settings of
+    Just settings' -> do
+      Gtk.setSettingsGtkCursorBlink settings' False
+    Nothing -> return ()
 
   Gtk.cssProviderLoadFromPath provider path
   Gtk.styleContextAddProviderForScreen
