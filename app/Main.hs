@@ -31,13 +31,13 @@ data Luggage = Luggage { screen   :: Screen
 
 type AppState a = State Luggage a
 
-data Event = Closed
-           | OpenFileSelected (Maybe FilePath)
-           | NewClicked
-           | OpenClicked
-           | Typed
-           | SaveClicked
-           | SaveFileSelected (Maybe FilePath)
+data Event = Closed                            -- ^ The window was closed.
+           | OpenFileSelected (Maybe FilePath) -- ^ An open target was selected in the FileChooser.
+           | NewClicked                        -- ^ The new document button was clicked.
+           | OpenClicked                       -- ^ The open button was clicked.
+           | Rerender                          -- ^ Re-render the contents of the buffer, used in some circumstances.
+           | SaveClicked                       -- ^ The save button was clicked.
+           | SaveFileSelected (Maybe FilePath) -- ^ A save target was selected in the FileChooser.
 
 -- | Create an empty TextBuffer.
 -- [TODO] Remove the use of `unsafePerformIO` here.
@@ -144,8 +144,10 @@ update' s (SaveFileSelected Nothing)     = Transition s { screen = Editing } $ r
 update' s OpenClicked                    = Transition s { screen = Open } $ return Nothing
 update' s (OpenFileSelected (Just file)) = Transition s { screen = Editing } $ do
   contents <- T.readFile file
+  Gtk.textBufferBeginUserAction $ buffer s
   Gtk.textBufferSetText (buffer s) contents $ fromIntegral $ bytes contents
-  return Nothing
+  Gtk.textBufferEndUserAction $ buffer s
+  return $ Nothing
 update' s (OpenFileSelected Nothing) = Transition s { screen = Editing } $ return Nothing
 update' _ _          = Exit
 
