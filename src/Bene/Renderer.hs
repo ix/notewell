@@ -159,5 +159,6 @@ blockquote = do
   Gtk.setTextTagIndent tag 30
   return tag
 
+-- | /O(n)/ Return the length (in bytes) of a Text string.
 bytes :: Text -> Int
 bytes = BS.length . T.encodeUtf8

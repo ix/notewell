@@ -35,7 +35,6 @@ data Event = Closed                            -- ^ The window was closed.
            | OpenFileSelected (Maybe FilePath) -- ^ An open target was selected in the FileChooser.
            | NewClicked                        -- ^ The new document button was clicked.
            | OpenClicked                       -- ^ The open button was clicked.
-           | Rerender                          -- ^ Re-render the contents of the buffer, used in some circumstances.
            | SaveClicked                       -- ^ The save button was clicked.
            | SaveFileSelected (Maybe FilePath) -- ^ A save target was selected in the FileChooser.
 
@@ -86,10 +85,17 @@ getBufferContents buffer = do
   e <- Gtk.textBufferGetEndIter buffer
   Gtk.textBufferGetText buffer s e True
 
+
 -- | Place a widget inside a BoxChild and allow it to expand.
 expandableChild :: Widget a -> BoxChild a
 expandableChild =
   BoxChild defaultBoxChildProperties { expand = True, fill = True }
+
+toolbar :: BoxChild Event
+toolbar = container
+  Gtk.Box
+  [#orientation := Gtk.OrientationHorizontal]
+  [widget Gtk.Button [on #clicked SaveClicked, #label := "Save"]]
 
 view' :: AppState (AppView Gtk.Window Event)
 view' = do
@@ -121,35 +127,41 @@ view' = do
               ]
         Editing ->
           container Gtk.Box [#orientation := Gtk.OrientationVertical]
-            $ [expandableChild $ bin Gtk.ScrolledWindow [] $ editor b, expandableChild $ widget Gtk.Button [on #clicked SaveClicked]]
+            $ [expandableChild $ bin Gtk.ScrolledWindow [] $ editor b, toolbar]
         Save -> widget
           Gtk.FileChooserWidget
           [ #action := Gtk.FileChooserActionSave
-          , onM #fileActivated (fmap SaveFileSelected . Gtk.fileChooserGetFilename)
+          , onM #fileActivated
+                (fmap SaveFileSelected . Gtk.fileChooserGetFilename)
           ]
         Open -> widget
           Gtk.FileChooserWidget
           [ #action := Gtk.FileChooserActionOpen
-          , onM #fileActivated (fmap OpenFileSelected . Gtk.fileChooserGetFilename) 
+          , onM #fileActivated
+                (fmap OpenFileSelected . Gtk.fileChooserGetFilename)
           ]
 
 
 update' :: Luggage -> Event -> Transition Luggage Event
-update' s NewClicked                     = Transition s { screen = Editing } $ return Nothing
-update' s SaveClicked                    = Transition s { screen = Save } $ return Nothing
-update' s (SaveFileSelected (Just file)) = Transition s { screen = Editing } $ do
-  T.writeFile file =<< (getBufferContents $ buffer s)
-  return Nothing
-update' s (SaveFileSelected Nothing)     = Transition s { screen = Editing } $ return Nothing
-update' s OpenClicked                    = Transition s { screen = Open } $ return Nothing
-update' s (OpenFileSelected (Just file)) = Transition s { screen = Editing } $ do
-  contents <- T.readFile file
-  Gtk.textBufferBeginUserAction $ buffer s
-  Gtk.textBufferSetText (buffer s) contents $ fromIntegral $ bytes contents
-  Gtk.textBufferEndUserAction $ buffer s
-  return $ Nothing
-update' s (OpenFileSelected Nothing) = Transition s { screen = Editing } $ return Nothing
-update' _ _          = Exit
+update' s NewClicked  = Transition s { screen = Editing } $ return Nothing
+update' s SaveClicked = Transition s { screen = Save } $ return Nothing
+update' s (SaveFileSelected (Just file)) =
+  Transition s { screen = Editing } $ do
+    T.writeFile file =<< (getBufferContents $ buffer s)
+    return Nothing
+update' s (SaveFileSelected Nothing) =
+  Transition s { screen = Editing } $ return Nothing
+update' s OpenClicked = Transition s { screen = Open } $ return Nothing
+update' s (OpenFileSelected (Just file)) =
+  Transition s { screen = Editing } $ do
+    contents <- T.readFile file
+    Gtk.textBufferBeginUserAction $ buffer s
+    Gtk.textBufferSetText (buffer s) contents $ fromIntegral $ bytes contents
+    Gtk.textBufferEndUserAction $ buffer s
+    return $ Nothing
+update' s (OpenFileSelected Nothing) =
+  Transition s { screen = Editing } $ return Nothing
+update' _ _ = Exit
 
 main :: IO ()
 main = do
@@ -159,7 +171,7 @@ main = do
   screen   <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
   provider <- Gtk.cssProviderNew
   settings <- Gtk.settingsGetDefault
-  
+
   case settings of
     Just settings' -> do
       Gtk.setSettingsGtkCursorBlink settings' False
