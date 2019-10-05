@@ -39,11 +39,11 @@ packages:
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
-extra-deps:
-  - gi-gtk-declarative-0.5.0@sha256:e710da215736dac238513d78726f6cff583a6eb60b0281dc392eec5f15ea5e1b,3908
-  - gi-gtk-declarative-app-simple-0.5.0@sha256:95a2c64a4f9422b28d9d868f19f874e2bee2dcd6a8389cb06b9487a7825d3257,1818
 
-# [NOTE] until gi-gtk-declarative updates
+extra-deps:
+  - gi-gtk-declarative-0.6.0@sha256:e237751dccb85367891b4238d0a0f9463a1851c658e7da2282e3b11571445a04,3965
+  - gi-gtk-declarative-app-simple-0.6.0@sha256:96bbc8a584fcfc183b099c3393e7f81b78c35d7b9e79b2eae340fa2202f59bf7,1818
+
 allow-newer: true
 # Override default flag values for local packages and extra-deps
 # flags: {}

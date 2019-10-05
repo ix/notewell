@@ -1,5 +1,5 @@
 name:                bene
-version:             0.1.0.0
+version:             0.2.0.0
 github:              "ix/bene"
 license:             BSD3
 author:              "Rose"
@@ -10,8 +10,9 @@ extra-source-files:
 - README.md
 - ChangeLog.md
 
-data-files:
-- themes/giorno/*
+data-dir: .
+data-files: 
+  - themes/**/*.css
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -26,8 +27,8 @@ dependencies:
 - base >= 4.7 && < 5
 - text >= 1.2.3 && < 1.3
 - gi-gtk >= 3.0.31 && < 3.1
-- gi-gtk-declarative >= 0.5 && < 0.6
-- gi-gtk-declarative-app-simple >= 0.5 && < 0.6
+- gi-gtk-declarative >= 0.6.0 && < 0.7
+- gi-gtk-declarative-app-simple >= 0.6.0 && < 0.7
 - cmark-gfm >= 0.2.0 && < 0.3
 - gi-gdk >= 3.0.21 && < 3.1
 - gi-pango >= 1.0.21 && < 1.1
@@ -38,6 +39,8 @@ dependencies:
 
 library:
   source-dirs: src
+  other-modules:
+    - Paths_bene
 
 executables:
   bene:
@@ -49,6 +52,8 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - bene
+    other-modules:
+    - Paths_bene
 
 tests:
   bene-test:
