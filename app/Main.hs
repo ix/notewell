@@ -17,8 +17,8 @@ import qualified Data.ByteString.Char8         as BS
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
 import           System.IO.Unsafe
-import           Bene.Renderer
-import           Paths_bene
+import           Notewell.Renderer
+import           Paths_notewell
 import           Control.Monad.Trans.State
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
@@ -104,7 +104,7 @@ view' = do
   return
     $ bin
         Gtk.Window
-        [ #title := "Bene"
+        [ #title := "Notewell"
         , on #deleteEvent (const (True, Closed))
         , #widthRequest := 480
         , #heightRequest := 300

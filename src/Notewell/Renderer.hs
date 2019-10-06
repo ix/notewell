@@ -1,14 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
 {- |
- Module : Bene.Renderer
+ Module : Notewell.Renderer
  Description : Renders CMark node trees as GTK widgets.
  Copyright : Rose <rose@empty.town> & Max
  License : BSD3
  Maintainer : rose@empty.town
 -}
 
-module Bene.Renderer where
+module Notewell.Renderer where
 
 import qualified Data.ByteString               as BS
 

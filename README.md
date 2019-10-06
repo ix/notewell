@@ -1,9 +1,9 @@
-# Bene
-Bene is a cross-platform Markdown editor written in Haskell using `gi-gtk-declarative`.
+# Notewell
+Notewell is a cross-platform Markdown editor written in Haskell using `gi-gtk-declarative`.
 
 It uses `cmark-gfm` to parse Markdown blazingly fast and renders to a TextView -- so there are no browsers involved here.
 
-Bene is a __work in progress__ and so things might break or simply not be implemented at all. 
+Notewell is a __work in progress__ and so things might break or simply not be implemented at all. 
 
 Releases will be made when the software meets a criteria of basic usability.
 

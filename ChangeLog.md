@@ -1,3 +1,3 @@
-# Changelog for bene
+# Changelog for Notewell
 
 ## Unreleased changes

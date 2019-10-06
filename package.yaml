@@ -1,6 +1,6 @@
-name:                bene
+name:                notewell
 version:             0.2.0.0
-github:              "ix/bene"
+github:              "ix/notewell"
 license:             BSD3
 author:              "Rose"
 maintainer:          "rose@empty.town"
@@ -21,7 +21,7 @@ data-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/ix/bene#readme>
+description:         Please see the README on GitHub at <https://github.com/ix/notewell#readme>
 
 dependencies:
 - base >= 4.7 && < 5
@@ -40,10 +40,10 @@ dependencies:
 library:
   source-dirs: src
   other-modules:
-    - Paths_bene
+    - Paths_notewell
 
 executables:
-  bene:
+  notewell:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -51,12 +51,12 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - bene
+    - notewell
     other-modules:
-    - Paths_bene
+    - Paths_notewell
 
 tests:
-  bene-test:
+  notewell-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -64,4 +64,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - bene
+    - notewell

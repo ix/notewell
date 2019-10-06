@@ -1,12 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 {- |
- Module : Bene.Pango
+ Module : Notewell.Pango
  Description : A wrapper for a subset of the Pango Markup Language. 
  Copyright : Rose <rose@empty.town> & Max
  License : BSD3
  Maintainer : rose@empty.town
 -}
-module Bene.Pango where
+module Notewell.Pango where
 
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
