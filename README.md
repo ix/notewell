@@ -1,4 +1,8 @@
 # Notewell
+
+![](meta/screenshot-wsl.png)
+_Notewell rendering its own README_
+
 Notewell is a cross-platform Markdown editor written in Haskell using `gi-gtk-declarative`.
 
 It uses `cmark-gfm` to parse Markdown blazingly fast and renders to a TextView -- so there are no browsers involved here.

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 16318f4fac8453b034c2fae4f8eadef624987ac5fb3ac12af19294fc9fff2fb4
+-- hash: 228e2e1bab91a1719ceba5a53f85d596e55bfc77f286149b913d270c6b8ad395
 
 name:           notewell
 version:        0.2.0.0
@@ -26,6 +26,7 @@ data-files:
     themes/textbook/textbook.css
     themes/giorno/icons/folder-opened.svg
     themes/giorno/icons/new-file.svg
+    themes/notte/icons/folder-opened.svg
     themes/notte/icons/new-file.svg
 data-dir:       .
 
