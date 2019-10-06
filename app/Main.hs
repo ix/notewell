@@ -94,7 +94,7 @@ expandableChild =
 toolbar :: BoxChild Event
 toolbar = container
   Gtk.Box
-  [#orientation := Gtk.OrientationHorizontal]
+  [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
   [widget Gtk.Button [on #clicked SaveClicked, #label := "Save"]]
 
 view' :: AppState (AppView Gtk.Window Event)

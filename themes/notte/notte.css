@@ -45,3 +45,23 @@ scrolledwindow { background: @bg_color; }
     background: @accent_color;
     color: @bg_color;
 }
+
+.toolbar { background: #151515; }
+
+.toolbar button { 
+    background: #151515;
+    border: none;
+    box-shadow: none;
+    text-shadow: none;
+    color: #aaa;
+    border-radius: 0px;
+    padding: 0em 1em 0em 1em;
+}
+
+.toolbar button:hover {
+    background: #191919;
+    color: @accent_color;
+    transition: color 0.5s;
+}
+
+.toolbar button:active { background: #111; }
