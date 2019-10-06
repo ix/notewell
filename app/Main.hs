@@ -11,6 +11,7 @@ import qualified Data.Text.Encoding            as T
 import           Control.Monad
 import           Control.Applicative
 import           Control.Concurrent.Async       ( async )
+import qualified GI.GdkPixbuf                  as Gdk
 import qualified GI.Gdk                        as Gdk
 import qualified GI.Gtk                        as Gtk
 import qualified Data.ByteString.Char8         as BS
@@ -22,6 +23,7 @@ import           Paths_notewell
 import           Control.Monad.Trans.State
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
+import           Data.Int                       ( Int32 )
 
 data Screen = Welcome | Editing | Save | Open
 
@@ -85,17 +87,24 @@ getBufferContents buffer = do
   e <- Gtk.textBufferGetEndIter buffer
   Gtk.textBufferGetText buffer s e True
 
-
 -- | Place a widget inside a BoxChild and allow it to expand.
 expandableChild :: Widget a -> BoxChild a
 expandableChild =
   BoxChild defaultBoxChildProperties { expand = True, fill = True }
 
+-- | Simply a shorthand for the toolbar component.
 toolbar :: BoxChild Event
 toolbar = container
   Gtk.Box
   [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
   [widget Gtk.Button [on #clicked SaveClicked, #label := "Save"]]
+
+-- | Used as a callback with afterCreated to set the icon of a ToolButton.
+setIcon :: FilePath -> Int32 -> Gtk.ToolButton -> IO ()
+setIcon fp size tb = do
+  icon <- Gdk.pixbufNewFromFileAtSize fp size size
+  image <- Gtk.imageNewFromPixbuf $ Just icon
+  Gtk.toolButtonSetIconWidget tb $ Just image
 
 view' :: AppState (AppView Gtk.Window Event)
 view' = do
@@ -114,13 +123,14 @@ view' = do
           container Gtk.Box [#orientation := Gtk.OrientationHorizontal]
             $ [ expandableChild $ widget
                 Gtk.ToolButton
-                [ #iconName := "document-new"
+                [ afterCreated $ setIcon "themes/giorno/icons/new-file.svg" 64
                 , on #clicked NewClicked
                 , classes ["intro"]
                 ]
               , expandableChild $ widget
                 Gtk.ToolButton
-                [ #iconName := "document-open"
+                [ afterCreated
+                  $ setIcon "themes/giorno/icons/folder-opened.svg" 64
                 , on #clicked OpenClicked
                 , classes ["intro"]
                 ]

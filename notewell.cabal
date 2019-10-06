@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 933ca0550d71074e307a573025f26dcf9525bd52bb47bc61ae23ba027723c879
+-- hash: 16318f4fac8453b034c2fae4f8eadef624987ac5fb3ac12af19294fc9fff2fb4
 
 name:           notewell
 version:        0.2.0.0
@@ -24,6 +24,9 @@ data-files:
     themes/giorno/giorno.css
     themes/notte/notte.css
     themes/textbook/textbook.css
+    themes/giorno/icons/folder-opened.svg
+    themes/giorno/icons/new-file.svg
+    themes/notte/icons/new-file.svg
 data-dir:       .
 
 source-repository head
@@ -45,6 +48,7 @@ library
     , bytestring >=0.10.8 && <0.11
     , cmark-gfm >=0.2.0 && <0.3
     , gi-gdk >=3.0.21 && <3.1
+    , gi-gdkpixbuf >=2.0.23 && <2.1
     , gi-gtk >=3.0.31 && <3.1
     , gi-gtk-declarative >=0.6.0 && <0.7
     , gi-gtk-declarative-app-simple >=0.6.0 && <0.7
@@ -67,6 +71,7 @@ executable notewell
     , bytestring >=0.10.8 && <0.11
     , cmark-gfm >=0.2.0 && <0.3
     , gi-gdk >=3.0.21 && <3.1
+    , gi-gdkpixbuf >=2.0.23 && <2.1
     , gi-gtk >=3.0.31 && <3.1
     , gi-gtk-declarative >=0.6.0 && <0.7
     , gi-gtk-declarative-app-simple >=0.6.0 && <0.7
@@ -91,6 +96,7 @@ test-suite notewell-test
     , bytestring >=0.10.8 && <0.11
     , cmark-gfm >=0.2.0 && <0.3
     , gi-gdk >=3.0.21 && <3.1
+    , gi-gdkpixbuf >=2.0.23 && <2.1
     , gi-gtk >=3.0.31 && <3.1
     , gi-gtk-declarative >=0.6.0 && <0.7
     , gi-gtk-declarative-app-simple >=0.6.0 && <0.7
