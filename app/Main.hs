@@ -28,8 +28,7 @@ import           Data.Int                       ( Int32 )
 data Screen = Welcome | Editing | Save | Open
 
 data Luggage = Luggage { screen   :: Screen
-                       , buffer   :: Gtk.TextBuffer
-                       , filename :: Maybe FilePath }
+                       , buffer   :: Gtk.TextBuffer }
 
 type AppState a = State Luggage a
 
@@ -201,5 +200,5 @@ main = do
   app = App { view         = evalState view'
             , update       = update'
             , inputs       = []
-            , initialState = Luggage Welcome createBuffer Nothing
+            , initialState = Luggage Welcome createBuffer
             }
