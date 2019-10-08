@@ -15,7 +15,7 @@ Releases will be made when the software meets a criteria of basic usability.
 
 First, make sure you have installed homebrew, then follow the steps below:
 
-1. Install GTK+ via brew by running `brew install gobject-introspection gtk+ gtk+3`
+1. Install GTK+3 and necessary libraries via brew by running `brew install gobject-introspection gtk+ gtk+3 librsvg libffo`
 
 2. Set the environment variable `PKG_CONFIG_PATH` via `export PKG_CONFIG_PATH="/usr/local/opt/libffi/lib/pkgconfig"`
 
