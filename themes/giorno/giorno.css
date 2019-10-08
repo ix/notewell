@@ -23,7 +23,7 @@ decoration {
 scrolledwindow { background: @bg_color; }
 
 .editor {
-    font-family: "Lato", serif; 
+    font-family: Lato;
     font-size: 1.25em;
     background: @bg_color;
     caret-color: @accent_color;
