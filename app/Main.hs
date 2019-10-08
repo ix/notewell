@@ -51,10 +51,9 @@ createBuffer = unsafePerformIO $ do
 markdownFileFilter :: IO Gtk.FileFilter
 markdownFileFilter = do
   filt <- Gtk.fileFilterNew
-  Gtk.fileFilterSetName filt $ Just "Markdown documents"
-  Gtk.fileFilterAddMimeType filt "text/markdown"
-  Gtk.fileFilterAddMimeType filt "text/x-markdown"
-  Gtk.fileFilterAddPattern filt "**/*.{markdown,md}"
+  Gtk.fileFilterSetName filt $ Just "Markdown"
+  Gtk.fileFilterAddPattern filt "*.md"
+  Gtk.fileFilterAddPattern filt "*.markdown"
   return filt
 
 -- | Create a TextView widget from a given TextBuffer.
@@ -146,6 +145,7 @@ view' = do
         Open -> widget
           Gtk.FileChooserWidget
           [ #action := Gtk.FileChooserActionOpen
+          , afterCreated $ \chooser -> Gtk.fileChooserAddFilter chooser =<< markdownFileFilter
           , onM #fileActivated
                 (fmap OpenFileSelected . Gtk.fileChooserGetFilename)
           ]
