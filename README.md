@@ -1,7 +1,7 @@
 # Notewell
 
-![](meta/screenshot-wsl.png)
-_Notewell rendering its own README. Here it's running upscaled over SSH on WSL, so it looks better natively than this._
+![](meta/screenshot.png)
+_Notewell rendering its own README._
 
 Notewell is a cross-platform Markdown editor written in Haskell using `gi-gtk-declarative`.
 
