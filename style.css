@@ -1,0 +1,20 @@
+@import url('https://fonts.googleapis.com/css?family=Lato:300,400,400i,700&display=swap');
+
+:root {
+    --background: #f8f8f8;
+    --foreground: #252526;
+    --accent: #EB2F7D;
+}
+
+* {
+    padding: 0;
+    margin: 0;
+}
+
+body {
+    font-family: Lato, Arial, Helvetica, sans-serif;
+    display: grid;
+    background: var(--background);
+    color: var(--foreground);
+    grid-template-rows: 1fr 1fr 1fr;
+}
