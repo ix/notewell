@@ -86,6 +86,9 @@ body {
     margin: 0.5rem;
     width: 50%;
     height: auto;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -webkit-user-drag: none;
 }
 
 #buttons {
