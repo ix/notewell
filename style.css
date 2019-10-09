@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css?family=Lato:300,400,400i,700&display=swap');
-
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 :root {
     --background: #f8f8f8;
     --foreground: #252526;
@@ -16,5 +16,150 @@ body {
     display: grid;
     background: var(--background);
     color: var(--foreground);
-    grid-template-rows: 1fr 1fr 1fr;
+    grid-template-rows: 0.05fr 0.1fr 0.025fr 1fr 0.05fr 0.2fr 0.05fr 0.5fr 0.1fr 0.05fr;
+}
+
+.squiggly {
+    text-decoration: underline #ddd3ca solid;
+}
+
+.darker {
+    text-decoration: underline #91857a solid;
+}
+
+.italic {
+    font-style: italic;
+}
+
+#logo {
+    grid-row: 2 / span 1;
+    display: grid;
+    grid-template: 1fr / 1fr 0.25fr 0.25fr 1fr;
+    font-size: 2.5em;
+    text-transform: uppercase;
+    gap: 0 1rem;
+}
+
+#logo h1 {
+    grid-column: 2 / span 1;
+    justify-self: end;
+    align-self: center;
+}
+
+#logo #caret {
+    grid-column: 3 / span 1;
+    align-self: center;
+    justify-self: start;
+    background: var(--accent);
+    display: block;
+    width: 12px;
+    height: 120px;
+    animation: blink 0.6s alternate ease-in-out infinite;
+}
+
+@keyframes blink {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+#splash {
+    grid-row: 4 / span 1;
+    font-size: 1.5em;
+    text-align: center;
+}
+
+#splash h1 {
+    font-weight: 300;
+    font-size: 1.8em;
+}
+
+#splash h3 {
+    font-size: 0.8em;
+    font-weight: 400;
+}
+
+#splash img {
+    margin: 0.5rem;
+    width: 50%;
+    height: auto;
+}
+
+#buttons {
+    grid-row: 6 / span 1;
+    text-align: center;
+}
+
+#buttons h3 {
+    font-weight: 400;
+    font-size: 0.8em;
+}
+
+.button {
+    display: inline-block;
+    padding: 1.25rem;
+    line-height: 1;
+    border-radius: 0.25rem;
+    text-decoration: none;
+    margin: 0.5rem;
+}
+
+.button i {
+    font-size: 2.5em;
+    vertical-align: -0.375em;
+    margin-right: 0.5rem;
+}
+
+#buy {
+    color: var(--background);
+    background: linear-gradient(rgb(91, 175, 253), rgb(73, 120, 221));
+    box-shadow: inset 0px 1px rgba(255, 255, 255, 0.25);
+    border: 1px solid rgb(31, 50, 112);
+}
+
+#src {
+    color: rgb(31, 50, 112);
+    border: 1px solid rgb(31, 50, 112);
+}
+
+#features {
+    grid-row: 8 / span 1;
+    display: grid;
+    grid-template: 1fr 1fr 1fr / 1fr 1fr;
+    justify-self: center;
+}
+
+.feature {
+    display: grid;
+    text-align: left;
+    max-width: 400px;
+    grid-template: 1fr 1fr / 0.25fr 1fr;
+}
+
+.feature i {
+    grid-row: 1 / span 2;
+    font-size: 2.5em;
+    justify-self: center;
+    align-self: center;
+}
+
+.feature h2 {
+    align-self: end;
+}
+
+.feature p {
+    align-self: start;
+}
+
+footer {
+    border-top: 1px solid #ccc;
+    background: #eee;
+    grid-row: 10 / span 1;
+    font-size: 0.8em;
+    display: grid;
+    grid: 1fr / 1fr;
+    place-items: center;
 }

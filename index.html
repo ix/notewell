@@ -3,11 +3,57 @@
     <head>
         <link rel="stylesheet" type="text/css" href="style.css">
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
     </head>
     <body>
+        <div id="logo">
+            <h1>Notewell</h1><span id="caret"></span>
+        </div>
         <div id="splash">
             <h1>Markdown. No browsers attached.</h1>
-            <img src="meta/screenshot.png">
+            <h2>Built on <span class="squiggly" title="Haskell, GTK+ (declarative!), cmark-gfm">fast, dependable technologies</span>.</h2>
+            <img title="Notewell rendering its readme under Windows 10." src="meta/screenshot.png">
+            <h3><span class="italic">No subscriptions. No microtransactions. No slowdown.</span></h3>
         </div>
+        <div id="buttons">
+            <a class="button" id="buy"><i class="material-icons md-48">payment</i>Buy Now ($5.99)</a>
+            <a href="https://github.com/ix/notewell" class="button" id="src"><i class="material-icons md-48">code</i>Source Code (FREE)</a>
+            <h3>Secure payments through Stripe. Lifetime updates with no extra payment.</h3>
+        </div>
+        <div id="features">
+            <div class="feature">
+                <i class="material-icons md-48">format_size</i>
+                <h2>Real-time previewing.</h2>
+                <p>Fast and beautiful formatting lets you focus on what matters most.</p>
+            </div>
+            <div class="feature">
+                <i class="material-icons md-48">brightness_2</i>
+                <h2>Dark mode.</h2>
+                <p>We know you love it.</p>
+            </div>
+            <div class="feature">
+                <i class="material-icons md-48">style</i>
+                <h2>Custom themes.</h2>
+                <p>Don't like the defaults? Making themes is easy.</p>
+            </div>
+            <div class="feature">
+                <i class="material-icons md-48">aspect_ratio</i>
+                <h2>Unobtrusive interface.</h2>
+                <p>No need to waste half your screen on a preview.</p>
+            </div>
+            <div class="feature">
+                <i class="material-icons md-48">compare_arrows</i>
+                <h2>Cross-platform. Open source.</h2>
+                <p>Windows, macOS & GNU/Linux &mdash; we've got you covered. Need something else? The code is open source, under the BSD3 license.</p>
+            </div>
+            <div class="feature">
+                <i class="material-icons md-48">memory</i>
+                <h2>High speed. Low memory.</h2>
+                <p>Notewell is written in Haskell, uses <span class="squiggly darker" title="cmark, if you're curious!">one of the fastest Markdown parsers</span> and has a custom rendering engine that doesn't use HTML.</p>
+            </div>
+        </div>
+        <footer>
+            <p>Copyright &copy; 2019 ix</p>
+        </footer>
     </body>
 </html>
