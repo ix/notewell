@@ -17,7 +17,6 @@ import qualified GI.Gtk                        as Gtk
 import qualified Data.ByteString.Char8         as BS
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
-import           System.IO.Unsafe
 import           Notewell.Renderer
 import           Paths_notewell
 import           Control.Monad.Trans.State
@@ -38,14 +37,6 @@ data Event = Closed                            -- ^ The window was closed.
            | OpenClicked                       -- ^ The open button was clicked.
            | SaveClicked                       -- ^ The save button was clicked.
            | SaveFileSelected (Maybe FilePath) -- ^ A save target was selected in the FileChooser.
-
--- | Create an empty TextBuffer.
--- [TODO] Remove the use of `unsafePerformIO` here.
-createBuffer :: Gtk.TextBuffer
-createBuffer = unsafePerformIO $ do
-  buffer <- Gtk.textBufferNew . Just =<< markdownTextTagTable
-  Gtk.on buffer #endUserAction (renderMarkdown buffer)
-  return buffer
 
 -- | Constructs a FileFilter which pertains to Markdown documents.
 markdownFileFilter :: IO Gtk.FileFilter
@@ -95,7 +86,7 @@ toolbar :: BoxChild Event
 toolbar = container
   Gtk.Box
   [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
-  [widget Gtk.Button [on #clicked SaveClicked, #label := "Save"]]
+  [ widget Gtk.Button [on #clicked SaveClicked, #label := "Save"]]
 
 -- | Used as a callback with afterCreated to set the icon of a ToolButton.
 setIcon :: FilePath -> Int32 -> Gtk.ToolButton -> IO ()
@@ -181,6 +172,16 @@ main = do
   provider <- Gtk.cssProviderNew
   settings <- Gtk.settingsGetDefault
 
+  buff <- Gtk.textBufferNew . Just =<< markdownTextTagTable
+  Gtk.on buff #endUserAction (renderMarkdown buff)
+
+  let app = App { view         = evalState view'
+            , update       = update'
+            , inputs       = []
+            , initialState = Luggage Welcome buff
+            }
+
+
   case settings of
     Just settings' -> do
       Gtk.setSettingsGtkCursorBlink settings' False
@@ -196,9 +197,3 @@ main = do
     runLoop app
     Gtk.mainQuit
   Gtk.main
- where
-  app = App { view         = evalState view'
-            , update       = update'
-            , inputs       = []
-            , initialState = Luggage Welcome createBuffer
-            }
