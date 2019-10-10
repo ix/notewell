@@ -31,23 +31,29 @@ body {
     font-style: italic;
 }
 
-#logo {
+#logowrapper {
     grid-row: 2 / span 1;
     display: grid;
-    grid-template: 1fr / 1fr 0.25fr 0.25fr 1fr;
+    place-items: center;
+    grid-template: 1fr / 1fr;
+}
+
+#logo {
+    display: grid;
+    grid-template: 1fr / 1fr;
     font-size: 2.5em;
     text-transform: uppercase;
     gap: 0 1rem;
 }
 
 #logo h1 {
-    grid-column: 2 / span 1;
+    grid-column: 1 / span 1;
     justify-self: end;
     align-self: center;
 }
 
 #logo #caret {
-    grid-column: 3 / span 1;
+    grid-column: 2 / span 1;
     align-self: center;
     justify-self: start;
     background: var(--accent);
