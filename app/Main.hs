@@ -15,6 +15,8 @@ import qualified GI.GdkPixbuf                  as Gdk
 import qualified GI.Gdk                        as Gdk
 import qualified GI.Gtk                        as Gtk
 import           Data.GI.Base.Overloading       ( IsDescendantOf )
+import           GI.GLib.Functions (idleAdd)
+import qualified GI.GLib.Constants as GLib
 import qualified Data.ByteString.Char8         as BS
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.State
@@ -169,9 +171,12 @@ update' s (SaveFileSelected Nothing) =
   Transition s { screen = Editing } $ return Nothing
 update' s (OpenFileSelected (Just file)) =
   Transition s { screen = Editing } $ do
-    contents <- T.readFile file
-    Gtk.textBufferSetText (buffer s) contents $ fromIntegral $ bytes contents
-    renderMarkdown (buffer s)
+  -- Wait on redraw operations before it's safe to modify the buffer.
+    idleAdd GLib.PRIORITY_HIGH_IDLE $ do
+      contents <- T.readFile file
+      Gtk.textBufferSetText (buffer s) contents $ fromIntegral $ bytes contents
+      renderMarkdown (buffer s)
+      return False
     return $ Nothing
 update' s (OpenFileSelected Nothing) =
   Transition s { screen = Editing } $ return Nothing

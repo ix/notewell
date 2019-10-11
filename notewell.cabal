@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4e017f1bd94a395551a26fa22206f85a103be2af1fcc79d782ebeba645304b40
+-- hash: 7d032082bdb6df7b314ae1c2d2c0f7edb463597511ea93dba30daa852f6cc9c5
 
 name:           notewell
 version:        0.2.0.0
@@ -50,6 +50,7 @@ library
     , cmark-gfm >=0.2.0 && <0.3
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
+    , gi-glib
     , gi-gtk >=3.0.31 && <3.1
     , gi-gtk-declarative >=0.6.0 && <0.7
     , gi-gtk-declarative-app-simple >=0.6.0 && <0.7
@@ -74,6 +75,7 @@ executable notewell
     , cmark-gfm >=0.2.0 && <0.3
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
+    , gi-glib
     , gi-gtk >=3.0.31 && <3.1
     , gi-gtk-declarative >=0.6.0 && <0.7
     , gi-gtk-declarative-app-simple >=0.6.0 && <0.7
@@ -100,6 +102,7 @@ test-suite notewell-test
     , cmark-gfm >=0.2.0 && <0.3
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
+    , gi-glib
     , gi-gtk >=3.0.31 && <3.1
     , gi-gtk-declarative >=0.6.0 && <0.7
     , gi-gtk-declarative-app-simple >=0.6.0 && <0.7
