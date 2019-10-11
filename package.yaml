@@ -33,6 +33,7 @@ dependencies:
 - cmark-gfm >= 0.2.0 && < 0.3
 - gi-gdkpixbuf >= 2.0.23 && < 2.1
 - gi-gdk >= 3.0.21 && < 3.1
+- haskell-gi-base >= 0.23.0 && < 0.24
 - gi-pango >= 1.0.21 && < 1.1
 - transformers >= 0.5.6 && < 0.6
 - async >= 2.2.2 && < 2.3
