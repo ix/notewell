@@ -14,6 +14,7 @@ import           Control.Concurrent.Async       ( async )
 import qualified GI.GdkPixbuf                  as Gdk
 import qualified GI.Gdk                        as Gdk
 import qualified GI.Gtk                        as Gtk
+import           Data.GI.Base.Overloading       ( IsDescendantOf )
 import qualified Data.ByteString.Char8         as BS
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.State
@@ -25,7 +26,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Data.Int                       ( Int32 )
 
-data Screen = Welcome | Editing | Save
+data Screen = Welcome | Editing
 
 data Luggage = Luggage { screen   :: Screen
                        , buffer   :: Gtk.TextBuffer }
@@ -59,25 +60,24 @@ editor buffer = widget
   ]
   where setBuffer tv = Gtk.textViewSetBuffer tv $ Just buffer
 
--- | A callback to be used with the open-file button which spawns a native file dialog
--- and emits an appropriate open event.
-openDialog :: Gtk.ToolButton -> IO Event
-openDialog button = do
+-- | A callback to be used with 'onM' to create a native file chooser dialog.
+spawnFileDialog
+  :: (Gtk.GObject w, IsDescendantOf Gtk.Widget w)
+  => Gtk.FileChooserAction
+  -> w
+  -> IO (Maybe FilePath)
+spawnFileDialog action invoker = do
   chooser <- Gtk.fileChooserNativeNew Nothing
                                       Gtk.noWindow
-                                      Gtk.FileChooserActionOpen
+                                      action
                                       Nothing
                                       Nothing
-  parentWindow <- Gtk.castTo Gtk.Window <$> Gtk.widgetGetToplevel button
+  parentWindow <- Gtk.castTo Gtk.Window <$> Gtk.widgetGetToplevel invoker
   Gtk.nativeDialogSetModal chooser True
   Gtk.nativeDialogSetTransientFor chooser =<< parentWindow
   Gtk.fileChooserAddFilter chooser =<< markdownFileFilter
   code <- Gtk.nativeDialogRun chooser
-  if code == accept
-    then do
-      filename <- Gtk.fileChooserGetFilename chooser
-      return $ OpenFileSelected filename
-    else return $ OpenFileSelected Nothing
+  if code == accept then Gtk.fileChooserGetFilename chooser else return Nothing
   where accept = fromIntegral $ fromEnum Gtk.ResponseTypeAccept
 
 -- | Render Markdown based on the content of a TextBuffer.
@@ -108,7 +108,14 @@ toolbar :: BoxChild Event
 toolbar = container
   Gtk.Box
   [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
-  [widget Gtk.Button [on #clicked SaveClicked, #label := "Save"]]
+  [ widget
+      Gtk.Button
+      [ onM #clicked $ \button -> do
+        filename <- spawnFileDialog Gtk.FileChooserActionSave button
+        return $ SaveFileSelected filename
+      , #label := "Save"
+      ]
+  ]
 
 -- | Used as a callback with afterCreated to set the icon of a ToolButton.
 setIcon :: FilePath -> Int32 -> Gtk.ToolButton -> IO ()
@@ -142,23 +149,18 @@ view' = do
                 Gtk.ToolButton
                 [ afterCreated
                   $ setIcon "themes/giorno/icons/folder-opened.svg" 64
-                , onM #clicked openDialog
+                , onM #clicked $ \button -> do
+                  filename <- spawnFileDialog Gtk.FileChooserActionOpen button
+                  return $ OpenFileSelected filename
                 , classes ["intro"]
                 ]
               ]
         Editing ->
           container Gtk.Box [#orientation := Gtk.OrientationVertical]
             $ [expandableChild $ bin Gtk.ScrolledWindow [] $ editor b, toolbar]
-        Save -> widget
-          Gtk.FileChooserWidget
-          [ #action := Gtk.FileChooserActionSave
-          , onM #fileActivated
-                (fmap SaveFileSelected . Gtk.fileChooserGetFilename)
-          ]
 
 update' :: Luggage -> Event -> Transition Luggage Event
-update' s NewClicked  = Transition s { screen = Editing } $ return Nothing
-update' s SaveClicked = Transition s { screen = Save } $ return Nothing
+update' s NewClicked = Transition s { screen = Editing } $ return Nothing
 update' s (SaveFileSelected (Just file)) =
   Transition s { screen = Editing } $ do
     T.writeFile file =<< (getBufferContents $ buffer s)
