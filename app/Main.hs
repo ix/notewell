@@ -59,6 +59,8 @@ editor buffer = widget
   ]
   where setBuffer tv = Gtk.textViewSetBuffer tv $ Just buffer
 
+-- | A callback to be used with the open-file button which spawns a native file dialog
+-- and emits an appropriate open event.
 openDialog :: Gtk.ToolButton -> IO Event
 openDialog button = do
   chooser <- Gtk.fileChooserNativeNew Nothing
@@ -166,9 +168,8 @@ update' s (SaveFileSelected Nothing) =
 update' s (OpenFileSelected (Just file)) =
   Transition s { screen = Editing } $ do
     contents <- T.readFile file
-    Gtk.textBufferBeginUserAction $ buffer s
     Gtk.textBufferSetText (buffer s) contents $ fromIntegral $ bytes contents
-    Gtk.textBufferEndUserAction $ buffer s
+    renderMarkdown (buffer s)
     return $ Nothing
 update' s (OpenFileSelected Nothing) =
   Transition s { screen = Editing } $ return Nothing
