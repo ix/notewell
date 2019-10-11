@@ -16,6 +16,7 @@ import qualified GI.Gdk                        as Gdk
 import qualified GI.Gtk                        as Gtk
 import qualified Data.ByteString.Char8         as BS
 import           GI.Gtk.Declarative
+import           GI.Gtk.Declarative.State
 import           GI.Gtk.Declarative.App.Simple
 import           Notewell.Renderer
 import           Paths_notewell
@@ -24,7 +25,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Data.Int                       ( Int32 )
 
-data Screen = Welcome | Editing | Save | Open
+data Screen = Welcome | Editing | Save
 
 data Luggage = Luggage { screen   :: Screen
                        , buffer   :: Gtk.TextBuffer }
@@ -58,6 +59,25 @@ editor buffer = widget
   ]
   where setBuffer tv = Gtk.textViewSetBuffer tv $ Just buffer
 
+openDialog :: Gtk.ToolButton -> IO Event
+openDialog button = do
+  chooser <- Gtk.fileChooserNativeNew Nothing
+                                      Gtk.noWindow
+                                      Gtk.FileChooserActionOpen
+                                      Nothing
+                                      Nothing
+  parentWindow <- Gtk.castTo Gtk.Window <$> Gtk.widgetGetToplevel button
+  Gtk.nativeDialogSetModal chooser True
+  Gtk.nativeDialogSetTransientFor chooser =<< parentWindow
+  Gtk.fileChooserAddFilter chooser =<< markdownFileFilter
+  code <- Gtk.nativeDialogRun chooser
+  if code == accept
+    then do
+      filename <- Gtk.fileChooserGetFilename chooser
+      return $ OpenFileSelected filename
+    else return $ OpenFileSelected Nothing
+  where accept = fromIntegral $ fromEnum Gtk.ResponseTypeAccept
+
 -- | Render Markdown based on the content of a TextBuffer.
 renderMarkdown :: Gtk.TextBuffer -> IO ()
 renderMarkdown buffer = clearTags buffer >> formatBuffer buffer
@@ -86,12 +106,12 @@ toolbar :: BoxChild Event
 toolbar = container
   Gtk.Box
   [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
-  [ widget Gtk.Button [on #clicked SaveClicked, #label := "Save"]]
+  [widget Gtk.Button [on #clicked SaveClicked, #label := "Save"]]
 
 -- | Used as a callback with afterCreated to set the icon of a ToolButton.
 setIcon :: FilePath -> Int32 -> Gtk.ToolButton -> IO ()
 setIcon fp size tb = do
-  icon <- Gdk.pixbufNewFromFileAtSize fp size size
+  icon  <- Gdk.pixbufNewFromFileAtSize fp size size
   image <- Gtk.imageNewFromPixbuf $ Just icon
   Gtk.toolButtonSetIconWidget tb $ Just image
 
@@ -120,7 +140,7 @@ view' = do
                 Gtk.ToolButton
                 [ afterCreated
                   $ setIcon "themes/giorno/icons/folder-opened.svg" 64
-                , on #clicked OpenClicked
+                , onM #clicked openDialog
                 , classes ["intro"]
                 ]
               ]
@@ -133,14 +153,6 @@ view' = do
           , onM #fileActivated
                 (fmap SaveFileSelected . Gtk.fileChooserGetFilename)
           ]
-        Open -> widget
-          Gtk.FileChooserWidget
-          [ #action := Gtk.FileChooserActionOpen
-          , afterCreated $ \chooser -> Gtk.fileChooserAddFilter chooser =<< markdownFileFilter
-          , onM #fileActivated
-                (fmap OpenFileSelected . Gtk.fileChooserGetFilename)
-          ]
-
 
 update' :: Luggage -> Event -> Transition Luggage Event
 update' s NewClicked  = Transition s { screen = Editing } $ return Nothing
@@ -151,7 +163,6 @@ update' s (SaveFileSelected (Just file)) =
     return Nothing
 update' s (SaveFileSelected Nothing) =
   Transition s { screen = Editing } $ return Nothing
-update' s OpenClicked = Transition s { screen = Open } $ return Nothing
 update' s (OpenFileSelected (Just file)) =
   Transition s { screen = Editing } $ do
     contents <- T.readFile file
@@ -172,14 +183,14 @@ main = do
   provider <- Gtk.cssProviderNew
   settings <- Gtk.settingsGetDefault
 
-  buff <- Gtk.textBufferNew . Just =<< markdownTextTagTable
+  buff     <- Gtk.textBufferNew . Just =<< markdownTextTagTable
   Gtk.on buff #endUserAction (renderMarkdown buff)
 
   let app = App { view         = evalState view'
-            , update       = update'
-            , inputs       = []
-            , initialState = Luggage Welcome buff
-            }
+                , update       = update'
+                , inputs       = []
+                , initialState = Luggage Welcome buff
+                }
 
 
   case settings of
