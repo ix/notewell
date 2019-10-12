@@ -34,7 +34,7 @@ dependencies:
 - gi-gdkpixbuf >= 2.0.23 && < 2.1
 - gi-gdk >= 3.0.21 && < 3.1
 - haskell-gi-base >= 0.23.0 && < 0.24
-- gi-glib
+- gi-glib >= 2.0.23 && < 2.1
 - gi-pango >= 1.0.21 && < 1.1
 - transformers >= 0.5.6 && < 0.6
 - async >= 2.2.2 && < 2.3
@@ -50,10 +50,19 @@ executables:
   notewell:
     main:                Main.hs
     source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+    when:
+      - condition: 'os(windows)'
+        then:
+          ghc-options:  
+          - -threaded
+          - -rtsopts
+          - -with-rtsopts=-N
+          - -optl-mwindows
+        else:
+          ghc-options:
+          - -threaded
+          - -rtsopts
+          - -with-rtsopts=-N
     dependencies:
     - notewell
     other-modules:
