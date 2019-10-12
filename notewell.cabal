@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7d032082bdb6df7b314ae1c2d2c0f7edb463597511ea93dba30daa852f6cc9c5
+-- hash: 7048e2d91584c54a9705d9e4330c3d38d9c9659539f8649eff5ca1c00472208a
 
 name:           notewell
 version:        0.2.0.0
@@ -37,7 +37,6 @@ source-repository head
 library
   exposed-modules:
       GI.Gtk.Declarative.Container.FlowBox
-      Notewell.Pango
       Notewell.Renderer
   other-modules:
       Paths_notewell
@@ -50,7 +49,7 @@ library
     , cmark-gfm >=0.2.0 && <0.3
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
-    , gi-glib
+    , gi-glib >=2.0.23 && <2.1
     , gi-gtk >=3.0.31 && <3.1
     , gi-gtk-declarative >=0.6.0 && <0.7
     , gi-gtk-declarative-app-simple >=0.6.0 && <0.7
@@ -67,7 +66,6 @@ executable notewell
       Paths_notewell
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       async >=2.2.2 && <2.3
     , base >=4.7 && <5
@@ -75,7 +73,7 @@ executable notewell
     , cmark-gfm >=0.2.0 && <0.3
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
-    , gi-glib
+    , gi-glib >=2.0.23 && <2.1
     , gi-gtk >=3.0.31 && <3.1
     , gi-gtk-declarative >=0.6.0 && <0.7
     , gi-gtk-declarative-app-simple >=0.6.0 && <0.7
@@ -85,6 +83,10 @@ executable notewell
     , text >=1.2.3 && <1.3
     , transformers >=0.5.6 && <0.6
     , vector >=0.12.0 && <0.13
+  if os(windows)
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N -optl-mwindows -Wall
+  else
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
   default-language: Haskell2010
 
 test-suite notewell-test
@@ -102,7 +104,7 @@ test-suite notewell-test
     , cmark-gfm >=0.2.0 && <0.3
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
-    , gi-glib
+    , gi-glib >=2.0.23 && <2.1
     , gi-gtk >=3.0.31 && <3.1
     , gi-gtk-declarative >=0.6.0 && <0.7
     , gi-gtk-declarative-app-simple >=0.6.0 && <0.7

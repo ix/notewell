@@ -58,11 +58,13 @@ executables:
           - -rtsopts
           - -with-rtsopts=-N
           - -optl-mwindows
+          - -Wall
         else:
           ghc-options:
           - -threaded
           - -rtsopts
           - -with-rtsopts=-N
+          - -Wall
     dependencies:
     - notewell
     other-modules:

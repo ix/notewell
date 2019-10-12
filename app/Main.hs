@@ -7,9 +7,7 @@ module Main where
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Text.IO                  as T
-import qualified Data.Text.Encoding            as T
 import           Control.Monad
-import           Control.Applicative
 import           Control.Concurrent.Async       ( async )
 import qualified GI.GdkPixbuf                  as Gdk
 import qualified GI.Gdk                        as Gdk
@@ -17,15 +15,11 @@ import qualified GI.Gtk                        as Gtk
 import           Data.GI.Base.Overloading       ( IsDescendantOf )
 import           GI.GLib.Functions (idleAdd)
 import qualified GI.GLib.Constants as GLib
-import qualified Data.ByteString.Char8         as BS
 import           GI.Gtk.Declarative
-import           GI.Gtk.Declarative.State
 import           GI.Gtk.Declarative.App.Simple
 import           Notewell.Renderer
 import           Paths_notewell
 import           Control.Monad.Trans.State
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Class
 import           Data.Int                       ( Int32 )
 
 data Screen = Welcome | Editing
