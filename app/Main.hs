@@ -13,14 +13,17 @@ import qualified GI.GdkPixbuf                  as Gdk
 import qualified GI.Gdk                        as Gdk
 import qualified GI.Gtk                        as Gtk
 import           Data.GI.Base.Overloading       ( IsDescendantOf )
-import           GI.GLib.Functions (idleAdd)
-import qualified GI.GLib.Constants as GLib
+import           GI.GLib.Functions              ( idleAdd )
+import qualified GI.GLib.Constants             as GLib
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
 import           Notewell.Renderer
+import           Notewell.Theming
+import           Notewell.Theming.CSS
 import           Paths_notewell
 import           Control.Monad.Trans.State
 import           Data.Int                       ( Int32 )
+import           Data.Either                    ( fromRight )
 
 data Screen = Welcome | Editing
 
@@ -180,12 +183,12 @@ main :: IO ()
 main = do
   void $ Gtk.init Nothing
 
-  path     <- T.pack <$> getDataFileName "themes/giorno/giorno.css"
-  screen   <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
   provider <- Gtk.cssProviderNew
   settings <- Gtk.settingsGetDefault
+  theme    <- fromRight defaultTheme <$> (readTheme =<< getDataFileName "themes/giorno/giorno.json")
+  screen   <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
+  buff     <- Gtk.textBufferNew . Just =<< markdownTextTagTable theme
 
-  buff     <- Gtk.textBufferNew . Just =<< markdownTextTagTable
   Gtk.on buff #endUserAction (renderMarkdown buff)
 
   let app = App { view         = evalState view'
@@ -194,13 +197,14 @@ main = do
                 , initialState = Luggage Welcome buff
                 }
 
-
   case settings of
     Just settings' -> do
       Gtk.setSettingsGtkCursorBlink settings' False
+      when (isDark theme)
+        $ Gtk.setSettingsGtkApplicationPreferDarkTheme settings' True
     Nothing -> return ()
 
-  Gtk.cssProviderLoadFromPath provider path
+  Gtk.cssProviderLoadFromData provider $ buildCSS theme
   Gtk.styleContextAddProviderForScreen
     screen
     provider

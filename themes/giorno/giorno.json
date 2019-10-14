@@ -1,0 +1,37 @@
+{ 
+  "background": "#f8f8f8",
+  "foreground": "#252526",
+  "accent": "#eb2f7d",
+  "bodyFont": "Lato",
+  "isDark": false,
+  "heading": {
+    "weight": "heavy"
+  },
+  "emph": {
+    "style": "italic"
+  },
+  "strong": {
+    "weight": "heavy"
+  },
+  "code": {
+    "font": "monospace",
+    "scale": 0.75
+  },
+  "codeBlock": {
+    "font": "monospace",
+    "scale": 0.75
+  },
+  "strikethrough": {
+    "strikethrough": true
+  },
+  "thematicBreak": {
+    "justification": "center"
+  },
+  "list": {
+    "indent": 30
+  },
+  "blockquote": {
+    "style": "italic",
+    "indent": 30
+  }
+}
