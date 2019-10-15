@@ -13,19 +13,25 @@ import qualified GI.GdkPixbuf                  as Gdk
 import qualified GI.Gdk                        as Gdk
 import qualified GI.Gtk                        as Gtk
 import           Data.GI.Base.Overloading       ( IsDescendantOf )
-import           GI.GLib.Functions (idleAdd)
-import qualified GI.GLib.Constants as GLib
+import           GI.GLib.Functions              ( idleAdd )
+import qualified GI.GLib.Constants             as GLib
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
 import           Notewell.Renderer
+import           Notewell.Theming
+import           Notewell.Theming.CSS
+import           System.FilePath.Posix
+import           System.Environment             ( getExecutablePath )
 import           Paths_notewell
 import           Control.Monad.Trans.State
 import           Data.Int                       ( Int32 )
+import           Data.Either                    ( fromRight )
 
 data Screen = Welcome | Editing
 
-data Luggage = Luggage { screen   :: Screen
-                       , buffer   :: Gtk.TextBuffer }
+data Luggage = Luggage { screen     :: Screen
+                       , buffer     :: Gtk.TextBuffer
+                       , isDarkMode :: Bool }
 
 type AppState a = State Luggage a
 
@@ -114,16 +120,29 @@ toolbar = container
   ]
 
 -- | Used as a callback with afterCreated to set the icon of a ToolButton.
-setIcon :: FilePath -> Int32 -> Gtk.ToolButton -> IO ()
-setIcon fp size tb = do
-  icon  <- Gdk.pixbufNewFromFileAtSize fp size size
+setIcon :: Int32 -> FilePath -> Gtk.ToolButton -> IO ()
+setIcon size fp tb = do
+  path  <- takeDirectory <$> getExecutablePath
+  icon  <- Gdk.pixbufNewFromFileAtSize (path </> fp) size size
   image <- Gtk.imageNewFromPixbuf $ Just icon
   Gtk.toolButtonSetIconWidget tb $ Just image
 
+-- | Get the path to an icon, taking into account the theme.
+getIconPath :: FilePath -> AppState FilePath
+getIconPath filename = do
+  mode <- gets isDarkMode
+  return
+    $   "themes"
+    </> "icons"
+    </> (if mode then "dark" else "light")
+    </> filename
+
 view' :: AppState (AppView Gtk.Window Event)
 view' = do
-  s <- gets screen
-  b <- gets buffer
+  s                <- gets screen
+  b                <- gets buffer
+  iconNewFile      <- getIconPath "new-file.svg"
+  iconFolderOpened <- getIconPath "folder-opened.svg"
   return
     $ bin
         Gtk.Window
@@ -137,14 +156,13 @@ view' = do
           container Gtk.Box [#orientation := Gtk.OrientationHorizontal]
             $ [ expandableChild $ widget
                 Gtk.ToolButton
-                [ afterCreated $ setIcon "themes/giorno/icons/new-file.svg" 64
+                [ afterCreated $ setIcon 64 iconNewFile
                 , on #clicked NewClicked
                 , classes ["intro"]
                 ]
               , expandableChild $ widget
                 Gtk.ToolButton
-                [ afterCreated
-                  $ setIcon "themes/giorno/icons/folder-opened.svg" 64
+                [ afterCreated $ setIcon 64 iconFolderOpened
                 , onM #clicked $ \button -> do
                   filename <- spawnFileDialog Gtk.FileChooserActionOpen button
                   return $ OpenFileSelected filename
@@ -180,27 +198,30 @@ main :: IO ()
 main = do
   void $ Gtk.init Nothing
 
-  path     <- T.pack <$> getDataFileName "themes/giorno/giorno.css"
-  screen   <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
   provider <- Gtk.cssProviderNew
   settings <- Gtk.settingsGetDefault
+  theme    <-
+    fromRight defaultTheme
+      <$> (readTheme =<< getDataFileName "themes/notte.json")
+  screen <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
+  buff   <- Gtk.textBufferNew . Just =<< markdownTextTagTable theme
 
-  buff     <- Gtk.textBufferNew . Just =<< markdownTextTagTable
   Gtk.on buff #endUserAction (renderMarkdown buff)
 
   let app = App { view         = evalState view'
                 , update       = update'
                 , inputs       = []
-                , initialState = Luggage Welcome buff
+                , initialState = Luggage Welcome buff (isDark theme)
                 }
-
 
   case settings of
     Just settings' -> do
       Gtk.setSettingsGtkCursorBlink settings' False
+      when (isDark theme)
+        $ Gtk.setSettingsGtkApplicationPreferDarkTheme settings' True
     Nothing -> return ()
 
-  Gtk.cssProviderLoadFromPath provider path
+  Gtk.cssProviderLoadFromData provider $ buildCSS theme
   Gtk.styleContextAddProviderForScreen
     screen
     provider

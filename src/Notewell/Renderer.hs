@@ -23,6 +23,8 @@ import qualified GI.Pango.Enums                as Pango
 
 import           Control.Monad
 
+import           Notewell.Theming
+
 -- | Apply a TextTag to a TextBuffer at the location from a PosInfo.
 -- TextIter begins at 0 whereas PosInfo begins at 1, so we decrement.
 applyTag :: Gtk.TextBuffer -> PosInfo -> Text -> IO ()
@@ -75,89 +77,66 @@ formatBuffer buffer = do
   content <- Gtk.textBufferGetText buffer s e True
   applyNode buffer (commonmarkToNode [] [extStrikethrough] content)
 
--- | Build a TextTagTable from our TextTags.
--- Note that Markdown uses HTML headings, and so exactly six levels h1-h6.
-markdownTextTagTable :: IO Gtk.TextTagTable
-markdownTextTagTable = do
+-- | Build a TextTagTable from a Theme.
+markdownTextTagTable :: Theme -> IO Gtk.TextTagTable
+markdownTextTagTable theme = do
   table <- Gtk.textTagTableNew
-  mapM_ (Gtk.textTagTableAdd table =<<) tags
+  mapM_ (Gtk.textTagTableAdd table <=< uncurry mkTag) zipped
+  mapM_ (Gtk.textTagTableAdd table =<<) $ map (mkHeadingTag $ heading theme) [1..6]
   return table
  where
-  tags =
+  zipped = zip (map Just names) (map ($ theme) constructors)
+  names =
+    [ "emph"
+    , "strong"
+    , "code"
+    , "codeBlock"
+    , "strikethrough"
+    , "thematicBreak"
+    , "list"
+    , "blockquote"
+    ]
+  constructors =
     [ emph
-      , strong
-      , code
-      , codeBlock
-      , strikethrough
-      , thematicBreak
-      , list
-      , blockquote
-      ]
-      ++ map heading [1 .. 6]
+    , strong
+    , code
+    , codeBlock
+    , strikethrough
+    , thematicBreak
+    , list
+    , blockquote
+    ]
 
-heading :: Int -> IO Gtk.TextTag
-heading level = do
-  tag <- Gtk.textTagNew $ Just $ T.concat ["heading", T.pack $ show level]
-  Gtk.setTextTagWeight tag $ fromIntegral $ fromEnum Pango.WeightHeavy
-  Gtk.setTextTagScale tag $ if
-    | level <= 1 -> 2
-    | level == 2 -> 1.75
-    | level == 3 -> 1.5
-    | level == 4 -> 1.25
-    | level >= 5 -> 1
+-- | Given an optional name and some TagProperties, produce a TextTag.
+mkTag :: Maybe Text -> TagProperties -> IO Gtk.TextTag
+mkTag name properties = do
+  tag <- Gtk.textTagNew name
+  whenJust (font properties) $ Gtk.setTextTagFamily tag
+  whenJust (color properties) $ Gtk.setTextTagForeground tag
+  whenJust (scale properties) $ Gtk.setTextTagScale tag
+  whenJust (style properties) $ Gtk.setTextTagStyle tag
+  whenJust (weight properties)
+    $ Gtk.setTextTagWeight tag
+    . fromIntegral
+    . fromEnum
+  whenJust (indent properties) $ Gtk.setTextTagIndent tag
+  whenJust (justification properties) $ Gtk.setTextTagJustification tag
   return tag
+  where whenJust m f = maybe (return ()) f m
 
-emph :: IO Gtk.TextTag
-emph = do
-  tag <- Gtk.textTagNew $ Just "emph"
-  Gtk.setTextTagStyle tag Pango.StyleItalic
+-- | Create a heading tag of a given level.
+mkHeadingTag :: TagProperties -> Level -> IO Gtk.TextTag
+mkHeadingTag properties level = do
+  tag <- mkTag (Just $ T.pack $ "heading" ++ show level) properties
+  Gtk.setTextTagScale tag $ scaling $ fromIntegral level 
   return tag
-
-strong :: IO Gtk.TextTag
-strong = do
-  tag <- Gtk.textTagNew $ Just "strong"
-  Gtk.setTextTagWeight tag $ fromIntegral $ fromEnum Pango.WeightHeavy
-  return tag
-
-code :: IO Gtk.TextTag
-code = do
-  tag <- Gtk.textTagNew $ Just "code"
-  Gtk.setTextTagFamily tag "monospace"
-  Gtk.setTextTagScale tag 0.75
-  return tag
-
-codeBlock :: IO Gtk.TextTag
-codeBlock = do
-  tag <- Gtk.textTagNew $ Just "codeblock"
-  Gtk.setTextTagFamily tag "monospace"
-  Gtk.setTextTagScale tag 0.75
-  return tag
-
-strikethrough :: IO Gtk.TextTag
-strikethrough = do
-  tag <- Gtk.textTagNew $ Just "strikethrough"
-  Gtk.setTextTagStrikethrough tag True
-  return tag
-
-thematicBreak :: IO Gtk.TextTag
-thematicBreak = do
-  tag <- Gtk.textTagNew $ Just "thematicbreak"
-  Gtk.setTextTagJustification tag Gtk.JustificationCenter
-  return tag
-
-list :: IO Gtk.TextTag
-list = do
-  tag <- Gtk.textTagNew $ Just "list"
-  Gtk.setTextTagIndent tag 30
-  return tag
-
-blockquote :: IO Gtk.TextTag
-blockquote = do
-  tag <- Gtk.textTagNew $ Just "blockquote"
-  Gtk.setTextTagVariant tag Pango.VariantSmallCaps
-  Gtk.setTextTagStyle tag Pango.StyleItalic
-  Gtk.setTextTagIndent tag 30
-  return tag
+  where scaling n
+          | n <= 1    = 3
+          | n == 2    = 2.5
+          | n == 3    = 2
+          | n == 4    = 1.5
+          | n == 5    = 1.25
+          | otherwise = 1
 
 -- | /O(n)/ Return the length (in bytes) of a Text string.
 bytes :: Text -> Int

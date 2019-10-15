@@ -1,0 +1,39 @@
+{ 
+  "background": "#252526",
+  "foreground": "#f8f8f8",
+  "toolbarColor": "#222",
+  "borderColor": "#111",
+  "accent": "#eb2f7d",
+  "bodyFont": "Lato",
+  "isDark": true,
+  "heading": {
+    "weight": "heavy"
+  },
+  "emph": {
+    "style": "italic"
+  },
+  "strong": {
+    "weight": "heavy"
+  },
+  "code": {
+    "font": "monospace",
+    "scale": 0.75
+  },
+  "codeBlock": {
+    "font": "monospace",
+    "scale": 0.75
+  },
+  "strikethrough": {
+    "strikethrough": true
+  },
+  "thematicBreak": {
+    "justification": "center"
+  },
+  "list": {
+    "indent": 30
+  },
+  "blockquote": {
+    "style": "italic",
+    "indent": 30
+  }
+}

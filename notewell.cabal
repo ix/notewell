@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7048e2d91584c54a9705d9e4330c3d38d9c9659539f8649eff5ca1c00472208a
+-- hash: f600de580be7366be477fb8b90b9bcb4832e292906ea10769fc88b10651ff673
 
 name:           notewell
 version:        0.2.0.0
@@ -21,13 +21,12 @@ extra-source-files:
     README.md
     ChangeLog.md
 data-files:
-    themes/giorno/giorno.css
-    themes/notte/notte.css
-    themes/textbook/textbook.css
-    themes/giorno/icons/folder-opened.svg
-    themes/giorno/icons/new-file.svg
-    themes/notte/icons/folder-opened.svg
-    themes/notte/icons/new-file.svg
+    themes/giorno.json
+    themes/notte.json
+    themes/icons/dark/folder-opened.svg
+    themes/icons/dark/new-file.svg
+    themes/icons/light/folder-opened.svg
+    themes/icons/light/new-file.svg
 data-dir:       .
 
 source-repository head
@@ -38,15 +37,19 @@ library
   exposed-modules:
       GI.Gtk.Declarative.Container.FlowBox
       Notewell.Renderer
+      Notewell.Theming
+      Notewell.Theming.CSS
   other-modules:
       Paths_notewell
   hs-source-dirs:
       src
   build-depends:
-      async >=2.2.2 && <2.3
+      aeson >=1.4.5 && <1.5
+    , async >=2.2.2 && <2.3
     , base >=4.7 && <5
     , bytestring >=0.10.8 && <0.11
     , cmark-gfm >=0.2.0 && <0.3
+    , filepath >=1.4.2 && <1.5
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
     , gi-glib >=2.0.23 && <2.1
@@ -67,10 +70,12 @@ executable notewell
   hs-source-dirs:
       app
   build-depends:
-      async >=2.2.2 && <2.3
+      aeson >=1.4.5 && <1.5
+    , async >=2.2.2 && <2.3
     , base >=4.7 && <5
     , bytestring >=0.10.8 && <0.11
     , cmark-gfm >=0.2.0 && <0.3
+    , filepath >=1.4.2 && <1.5
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
     , gi-glib >=2.0.23 && <2.1
@@ -84,9 +89,9 @@ executable notewell
     , transformers >=0.5.6 && <0.6
     , vector >=0.12.0 && <0.13
   if os(windows)
-    ghc-options: -threaded -rtsopts -with-rtsopts=-N -optl-mwindows -Wall
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N -optl-mwindows
   else
-    ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N
   default-language: Haskell2010
 
 test-suite notewell-test
@@ -98,10 +103,12 @@ test-suite notewell-test
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      async >=2.2.2 && <2.3
+      aeson >=1.4.5 && <1.5
+    , async >=2.2.2 && <2.3
     , base >=4.7 && <5
     , bytestring >=0.10.8 && <0.11
     , cmark-gfm >=0.2.0 && <0.3
+    , filepath >=1.4.2 && <1.5
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
     , gi-glib >=2.0.23 && <2.1
