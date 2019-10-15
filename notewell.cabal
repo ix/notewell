@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f9d3efa676cd1cfaa64a35d272f4a05cc40a369faa9b81c271fb80df8e17ca92
+-- hash: f600de580be7366be477fb8b90b9bcb4832e292906ea10769fc88b10651ff673
 
 name:           notewell
 version:        0.2.0.0
@@ -21,11 +21,12 @@ extra-source-files:
     README.md
     ChangeLog.md
 data-files:
-    themes/giorno/giorno.json
-    themes/giorno/icons/folder-opened.svg
-    themes/giorno/icons/new-file.svg
-    themes/notte/icons/folder-opened.svg
-    themes/notte/icons/new-file.svg
+    themes/giorno.json
+    themes/notte.json
+    themes/icons/dark/folder-opened.svg
+    themes/icons/dark/new-file.svg
+    themes/icons/light/folder-opened.svg
+    themes/icons/light/new-file.svg
 data-dir:       .
 
 source-repository head
@@ -48,6 +49,7 @@ library
     , base >=4.7 && <5
     , bytestring >=0.10.8 && <0.11
     , cmark-gfm >=0.2.0 && <0.3
+    , filepath >=1.4.2 && <1.5
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
     , gi-glib >=2.0.23 && <2.1
@@ -73,6 +75,7 @@ executable notewell
     , base >=4.7 && <5
     , bytestring >=0.10.8 && <0.11
     , cmark-gfm >=0.2.0 && <0.3
+    , filepath >=1.4.2 && <1.5
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
     , gi-glib >=2.0.23 && <2.1
@@ -105,6 +108,7 @@ test-suite notewell-test
     , base >=4.7 && <5
     , bytestring >=0.10.8 && <0.11
     , cmark-gfm >=0.2.0 && <0.3
+    , filepath >=1.4.2 && <1.5
     , gi-gdk >=3.0.21 && <3.1
     , gi-gdkpixbuf >=2.0.23 && <2.1
     , gi-glib >=2.0.23 && <2.1

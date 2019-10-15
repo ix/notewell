@@ -12,7 +12,7 @@ extra-source-files:
 
 data-dir: .
 data-files: 
-  - themes/**/*.json
+  - themes/*.json
   - themes/**/*.svg
 
 # Metadata used when publishing your package
@@ -41,6 +41,7 @@ dependencies:
 - vector >= 0.12.0 && < 0.13
 - bytestring >= 0.10.8 && < 0.11
 - aeson >= 1.4.5 && < 1.5
+- filepath >= 1.4.2 && < 1.5
 
 library:
   source-dirs: src

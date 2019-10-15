@@ -1,9 +1,11 @@
 { 
-  "background": "#f8f8f8",
-  "foreground": "#252526",
+  "background": "#252526",
+  "foreground": "#f8f8f8",
+  "toolbarColor": "#222",
+  "borderColor": "#111",
   "accent": "#eb2f7d",
   "bodyFont": "Lato",
-  "isDark": false,
+  "isDark": true,
   "heading": {
     "weight": "heavy"
   },

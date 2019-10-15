@@ -120,6 +120,7 @@ mkTag name properties = do
     . fromIntegral
     . fromEnum
   whenJust (indent properties) $ Gtk.setTextTagIndent tag
+  whenJust (justification properties) $ Gtk.setTextTagJustification tag
   return tag
   where whenJust m f = maybe (return ()) f m
 

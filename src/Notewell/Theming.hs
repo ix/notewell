@@ -21,6 +21,8 @@ data TagProperties = TagProperties { color  :: Maybe Text
 
 data Theme = Theme { background    :: Text
                    , foreground    :: Text
+                   , toolbarColor  :: Text
+                   , borderColor   :: Text
                    , accent        :: Text
                    , bodyFont      :: Text
                    , isDark        :: Bool
@@ -103,6 +105,8 @@ readTheme = eitherDecodeFileStrict
 defaultTheme :: Theme
 defaultTheme = Theme { foreground    = "black"
                      , background    = "white"
+                     , toolbarColor  = "grey"
+                     , borderColor   = "darkgrey"
                      , accent        = "red"
                      , bodyFont      = "Sans"
                      , isDark        = False

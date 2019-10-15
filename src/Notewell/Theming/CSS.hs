@@ -65,25 +65,27 @@ buildCSS theme =
 \    background: @accent_color;\
 \    color: @bg_color;\
 \}\
-\.toolbar { background: #eee; border-top: 1px solid #ccc; }\
+\.toolbar { background: " ++ toolbar ++ "; border-top: 1px solid " ++ border ++ "; }\
 \.toolbar button { \
-\    background: #eee;\
+\    background: " ++ toolbar ++ ";\
 \    border: none;\
 \    box-shadow: none;\
 \    text-shadow: none;\
-\    color: #333;\
+\    color: " ++ fgColor ++ ";\
 \    border-radius: 0px;\
 \    padding: 0em 1em 0em 1em;\
 \}\
 \.toolbar button:hover {\
-\    background: #ddd;\
+\    background: " ++ border ++ ";\
 \    color: @accent_color;\
 \    transition: color 0.5s;\
 \}\
-\.toolbar button:active { background: #ccc; }"
+\.toolbar button:active { background: " ++ border ++ "; }"
  where
   (++)    = append
   bgColor = encodeUtf8 $ background theme
   fgColor = encodeUtf8 $ foreground theme
   acColor = encodeUtf8 $ accent theme
+  toolbar = encodeUtf8 $ toolbarColor theme
+  border  = encodeUtf8 $ borderColor theme
   bf      = encodeUtf8 $ bodyFont theme
