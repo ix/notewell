@@ -21,7 +21,9 @@ import           Notewell.Renderer
 import           Notewell.Theming
 import           Notewell.Theming.CSS
 import           System.FilePath.Posix
-import           System.Environment             ( getExecutablePath )
+import           System.Environment             ( getExecutablePath
+                                                , getArgs
+                                                )
 import           Paths_notewell
 import           Control.Monad.Trans.State
 import           Data.Int                       ( Int32 )
@@ -195,14 +197,24 @@ update' s (OpenFileSelected Nothing) =
 update' _ _ = Exit
 
 main :: IO ()
-main = do
+main = getArgs >>= parseOpts
+
+parseOpts :: [String] -> IO ()
+parseOpts ("--theme":theme:_) = do
+  path  <- getDataFileName ("themes" </> theme <.> "json")
+  theme <- fromRight defaultTheme <$> readTheme path
+  startWithTheme theme
+parseOpts _ = do
+  path  <- getDataFileName ("themes" </> "giorno" <.> "json")
+  theme <- fromRight defaultTheme <$> readTheme path
+  startWithTheme theme
+
+startWithTheme :: Theme -> IO ()
+startWithTheme theme = do
   void $ Gtk.init Nothing
 
   provider <- Gtk.cssProviderNew
   settings <- Gtk.settingsGetDefault
-  theme    <-
-    fromRight defaultTheme
-      <$> (readTheme =<< getDataFileName "themes/notte.json")
   screen <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
   buff   <- Gtk.textBufferNew . Just =<< markdownTextTagTable theme
 
