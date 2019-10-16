@@ -16,24 +16,30 @@
     "weight": "heavy"
   },
   "code": {
-    "font": "monospace",
-    "scale": 0.75
+    "font": "Consolas",
+    "color": "#4f4f5f"
   },
   "codeBlock": {
-    "font": "monospace",
-    "scale": 0.75
+    "font": "Consolas",
+    "color": "#4f4f5f"
   },
   "strikethrough": {
     "strikethrough": true
   },
   "thematicBreak": {
+    "color": "#eb2f7d",
+    "scale": 2.0,
     "justification": "center"
   },
   "list": {
-    "indent": 30
+    "indent": 15,
+    "color": "#4f4f5f"
   },
   "blockquote": {
     "style": "italic",
-    "indent": 30
+    "indent": 30,
+    "color": "#4f4f5f",
+    "font": "Cambria",
+    "weight": "bold"
   }
 }
