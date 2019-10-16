@@ -49,7 +49,7 @@ applyNode buffer (Node (Just pos) STRONG children) = do
   mapM_ (applyNode buffer) children
 applyNode buffer (Node (Just pos) (CODE t) _) = applyTag buffer pos "code"
 applyNode buffer (Node (Just pos) (CODE_BLOCK _ t) _) =
-  applyTag buffer pos "codeblock"
+  applyTag buffer pos "codeBlock"
 applyNode buffer (Node (Just pos) (HEADING level) children) = do
   applyTag buffer pos $ T.concat ["heading", T.pack $ show level]
   mapM_ (applyNode buffer) children
@@ -57,7 +57,7 @@ applyNode buffer (Node (Just pos) STRIKETHROUGH children) = do
   applyTag buffer pos "strikethrough"
   mapM_ (applyNode buffer) children
 applyNode buffer (Node (Just pos) THEMATIC_BREAK children) = do
-  applyTag buffer pos "thematicbreak"
+  applyTag buffer pos "thematicBreak"
   mapM_ (applyNode buffer) children
 applyNode buffer (Node (Just pos) (LIST _) children) = do
   applyTag buffer pos "list"
