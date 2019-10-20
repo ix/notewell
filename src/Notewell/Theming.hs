@@ -1,5 +1,13 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{- |
+  Module : Notewell.Theming
+  Description : An Aeson wrapper around GTK TextTags.
+  Copyright : Rose <rose@empty.town> & Max
+  License : BSD3
+  Maintainer : rose@empty.town
+-}
+
 module Notewell.Theming where
 
 import           Data.Aeson

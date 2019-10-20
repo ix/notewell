@@ -19,7 +19,6 @@ import           CMarkGFM
 import qualified Data.Text                     as T
 
 import qualified GI.Gtk                        as Gtk
-import qualified GI.Pango.Enums                as Pango
 
 import           Control.Monad
 
@@ -47,8 +46,8 @@ applyNode buffer (Node (Just pos) EMPH children) = do
 applyNode buffer (Node (Just pos) STRONG children) = do
   applyTag buffer pos "strong"
   mapM_ (applyNode buffer) children
-applyNode buffer (Node (Just pos) (CODE t) _) = applyTag buffer pos "code"
-applyNode buffer (Node (Just pos) (CODE_BLOCK _ t) _) =
+applyNode buffer (Node (Just pos) (CODE _) _) = applyTag buffer pos "code"
+applyNode buffer (Node (Just pos) (CODE_BLOCK _ _) _) =
   applyTag buffer pos "codeBlock"
 applyNode buffer (Node (Just pos) (HEADING level) children) = do
   applyTag buffer pos $ T.concat ["heading", T.pack $ show level]
@@ -65,7 +64,7 @@ applyNode buffer (Node (Just pos) (LIST _) children) = do
 applyNode buffer (Node (Just pos) BLOCK_QUOTE children) = do
   applyTag buffer pos "blockquote"
   mapM_ (applyNode buffer) children
-applyNode _      (Node _ (TEXT t) _       ) = return ()
+applyNode _      (Node _ (TEXT _) _       ) = return ()
 applyNode buffer (Node _ _        children) = mapM_ (applyNode buffer) children
 
 -- | Parse the Markdown contained in a TextBuffer to a Node tree
@@ -128,7 +127,7 @@ mkTag name properties = do
 mkHeadingTag :: TagProperties -> Level -> IO Gtk.TextTag
 mkHeadingTag properties level = do
   tag <- mkTag (Just $ T.pack $ "heading" ++ show level) properties
-  Gtk.setTextTagScale tag $ scaling $ fromIntegral level 
+  Gtk.setTextTagScale tag $ scaling $ level 
   return tag
   where scaling n
           | n <= 1    = 3
