@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f600de580be7366be477fb8b90b9bcb4832e292906ea10769fc88b10651ff673
+-- hash: a98dd82749d5ae84e5cae7046bfdbe58840be3e2832a86a501c116988ab4b27c
 
 name:           notewell
 version:        0.2.0.0
@@ -36,6 +36,7 @@ source-repository head
 library
   exposed-modules:
       GI.Gtk.Declarative.Container.FlowBox
+      Notewell.Metrics
       Notewell.Renderer
       Notewell.Theming
       Notewell.Theming.CSS

@@ -20,6 +20,7 @@ import           GI.Gtk.Declarative.App.Simple
 import           Notewell.Renderer
 import           Notewell.Theming
 import           Notewell.Theming.CSS
+import           Notewell.Metrics
 import           System.FilePath.Posix
 import           System.Environment             ( getExecutablePath
                                                 , getArgs
@@ -28,6 +29,7 @@ import           Paths_notewell
 import           Control.Monad.Trans.State
 import           Data.Int                       ( Int32 )
 import           Data.Either                    ( fromRight )
+import System.IO.Unsafe
 
 data Screen = Welcome | Editing
 
@@ -43,6 +45,7 @@ data Event = Closed                            -- ^ The window was closed.
            | OpenClicked                       -- ^ The open button was clicked.
            | SaveClicked                       -- ^ The save button was clicked.
            | SaveFileSelected (Maybe FilePath) -- ^ A save target was selected in the FileChooser.
+           | Typed
 
 -- | Constructs a FileFilter which pertains to Markdown documents.
 markdownFileFilter :: IO Gtk.FileFilter
@@ -55,14 +58,14 @@ markdownFileFilter = do
 
 -- | Create a TextView widget from a given TextBuffer.
 editor :: Gtk.TextBuffer -> Widget Event
-editor buffer = widget
+editor textBuffer = widget
   Gtk.TextView
   [ afterCreated setBuffer
   , #wrapMode := Gtk.WrapModeWord
   , #margin := 10
   , classes ["editor"]
   ]
-  where setBuffer tv = Gtk.textViewSetBuffer tv $ Just buffer
+  where setBuffer tv = Gtk.textViewSetBuffer tv $ Just textBuffer
 
 -- | A callback to be used with 'onM' to create a native file chooser dialog.
 spawnFileDialog
@@ -80,27 +83,29 @@ spawnFileDialog action invoker = do
   Gtk.nativeDialogSetModal chooser True
   Gtk.nativeDialogSetTransientFor chooser =<< parentWindow
   Gtk.fileChooserAddFilter chooser =<< markdownFileFilter
-  code <- Gtk.nativeDialogRun chooser
-  if code == accept then Gtk.fileChooserGetFilename chooser else return Nothing
+  statusCode <- Gtk.nativeDialogRun chooser
+  if statusCode == accept
+    then Gtk.fileChooserGetFilename chooser
+    else return Nothing
   where accept = fromIntegral $ fromEnum Gtk.ResponseTypeAccept
 
 -- | Render Markdown based on the content of a TextBuffer.
 renderMarkdown :: Gtk.TextBuffer -> IO ()
-renderMarkdown buffer = clearTags buffer >> formatBuffer buffer
+renderMarkdown textBuffer = clearTags textBuffer >> formatBuffer textBuffer
 
 -- | Remove all TextTags from a buffer.
 clearTags :: Gtk.TextBuffer -> IO ()
-clearTags buffer = do
-  s <- Gtk.textBufferGetStartIter buffer
-  e <- Gtk.textBufferGetEndIter buffer
-  Gtk.textBufferRemoveAllTags buffer s e
+clearTags textBuffer = do
+  s <- Gtk.textBufferGetStartIter textBuffer
+  e <- Gtk.textBufferGetEndIter textBuffer
+  Gtk.textBufferRemoveAllTags textBuffer s e
 
 -- | Retrieve the contents of a TextBuffer.
 getBufferContents :: Gtk.TextBuffer -> IO Text
-getBufferContents buffer = do
-  s <- Gtk.textBufferGetStartIter buffer
-  e <- Gtk.textBufferGetEndIter buffer
-  Gtk.textBufferGetText buffer s e True
+getBufferContents textBuffer = do
+  s <- Gtk.textBufferGetStartIter textBuffer
+  e <- Gtk.textBufferGetEndIter textBuffer
+  Gtk.textBufferGetText textBuffer s e True
 
 -- | Place a widget inside a BoxChild and allow it to expand.
 expandableChild :: Widget a -> BoxChild a
@@ -108,18 +113,21 @@ expandableChild =
   BoxChild defaultBoxChildProperties { expand = True, fill = True }
 
 -- | Simply a shorthand for the toolbar component.
-toolbar :: BoxChild Event
-toolbar = container
-  Gtk.Box
-  [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
-  [ widget
+toolbar :: AppState (BoxChild Event)
+toolbar = do
+  textBuffer <- gets buffer
+  return $ container
+    Gtk.Box
+    [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
+    [ widget
       Gtk.Button
       [ onM #clicked $ \button -> do
         filename <- spawnFileDialog Gtk.FileChooserActionSave button
         return $ SaveFileSelected filename
       , #label := "Save"
       ]
-  ]
+    , widget Gtk.Label [#label := (T.pack . show $ count textBuffer)]
+    ]
 
 -- | Used as a callback with afterCreated to set the icon of a ToolButton.
 setIcon :: Int32 -> FilePath -> Gtk.ToolButton -> IO ()
@@ -145,6 +153,7 @@ view' = do
   b                <- gets buffer
   iconNewFile      <- getIconPath "new-file.svg"
   iconFolderOpened <- getIconPath "folder-opened.svg"
+  toolbar' <- toolbar
   return
     $ bin
         Gtk.Window
@@ -173,7 +182,9 @@ view' = do
               ]
         Editing ->
           container Gtk.Box [#orientation := Gtk.OrientationVertical]
-            $ [expandableChild $ bin Gtk.ScrolledWindow [] $ editor b, toolbar]
+            $ [ expandableChild $ bin Gtk.ScrolledWindow [] $ editor b
+              , toolbar' 
+              ]
 
 update' :: Luggage -> Event -> Transition Luggage Event
 update' s NewClicked = Transition s { screen = Editing } $ return Nothing
@@ -186,7 +197,7 @@ update' s (SaveFileSelected Nothing) =
 update' s (OpenFileSelected (Just file)) =
   Transition s { screen = Editing } $ do
   -- Wait on redraw operations before it's safe to modify the buffer.
-    idleAdd GLib.PRIORITY_HIGH_IDLE $ do
+    void $ idleAdd GLib.PRIORITY_HIGH_IDLE $ do
       contents <- T.readFile file
       Gtk.textBufferSetText (buffer s) contents $ fromIntegral $ bytes contents
       renderMarkdown (buffer s)
@@ -200,8 +211,8 @@ main :: IO ()
 main = getArgs >>= parseOpts
 
 parseOpts :: [String] -> IO ()
-parseOpts ("--theme":theme:_) = do
-  path  <- getDataFileName ("themes" </> theme <.> "json")
+parseOpts ("--theme" : themeName : _) = do
+  path  <- getDataFileName ("themes" </> themeName <.> "json")
   theme <- fromRight defaultTheme <$> readTheme path
   startWithTheme theme
 parseOpts _ = do
@@ -213,17 +224,17 @@ startWithTheme :: Theme -> IO ()
 startWithTheme theme = do
   void $ Gtk.init Nothing
 
-  provider <- Gtk.cssProviderNew
-  settings <- Gtk.settingsGetDefault
-  screen <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
-  buff   <- Gtk.textBufferNew . Just =<< markdownTextTagTable theme
+  provider  <- Gtk.cssProviderNew
+  settings  <- Gtk.settingsGetDefault
+  gtkScreen <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
+  buff      <- Gtk.textBufferNew . Just =<< markdownTextTagTable theme
 
-  Gtk.on buff #endUserAction (renderMarkdown buff)
+  void $ Gtk.on buff #endUserAction (renderMarkdown buff)
 
   let app = App { view         = evalState view'
                 , update       = update'
                 , inputs       = []
-                , initialState = Luggage Welcome buff (isDark theme)
+                , initialState = Luggage Welcome buff $ isDark theme
                 }
 
   case settings of
@@ -235,11 +246,11 @@ startWithTheme theme = do
 
   Gtk.cssProviderLoadFromData provider $ buildCSS theme
   Gtk.styleContextAddProviderForScreen
-    screen
+    gtkScreen
     provider
     (fromIntegral Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
   void . async $ do
-    runLoop app
+    void $ runLoop app
     Gtk.mainQuit
   Gtk.main
