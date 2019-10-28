@@ -2,6 +2,15 @@
 {-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{- |
+
+ Module : Main
+ Description : Main module. 
+ Copyright : Rose <rose@empty.town>
+ License : BSD3
+ Maintainer : rose@empty.town 
+-}
+
 module Main where
 
 import           Data.Text                      ( Text )
