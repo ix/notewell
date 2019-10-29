@@ -10,13 +10,12 @@ module Notewell.Metrics where
 
 import           GI.Gtk
 import qualified Data.Text                     as T
-import System.IO.Unsafe
 
 -- | Get counts for words, lines and characters from a TextBuffer.
 -- This function makes use of GTK's line & character count functions
 -- which perform caching and are thus likely faster than a manual approach.
-count :: TextBuffer -> (Int, Int, Int)
-count textBuffer = unsafePerformIO $ do
+count :: TextBuffer -> IO (Int, Int, Int)
+count textBuffer = do
   lineCount <- fromIntegral <$> textBufferGetLineCount textBuffer
   charCount <- fromIntegral <$> textBufferGetCharCount textBuffer
   startIter <- textBufferGetStartIter textBuffer
