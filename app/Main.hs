@@ -155,12 +155,16 @@ update' s (SaveFileSelected (Just file)) = Transition s { screen = Editing } $ d
   return $ Just Render
 update' s (SaveFileSelected Nothing    ) = Transition s { screen = Editing } $ return Nothing
 update' s (OpenFileSelected (Just file)) = Transition s { screen = Editing } $ do
+  let buffer = (editorBuffer . editorParams) s 
+  
   -- Wait on redraw operations before it's safe to modify the buffer.
   void $ idleAdd GLib.PRIORITY_HIGH_IDLE $ do
     contents <- T.readFile file
-    let buffer = (editorBuffer . editorParams) s in Gtk.set buffer [#text Gtk.:= contents]
+    Gtk.set buffer [#text Gtk.:= contents]
     return False
-  return $ Just Render
+
+  newCounts <- M.count buffer
+  return $ Just $ UpdateMetrics $ M.Metrics { M.counts = newCounts }
 update' s (OpenFileSelected Nothing) = Transition s { screen = Editing } $ return Nothing
 update' s (UpdateMetrics    m)       = Transition s { metrics = m } $ return $ Just Render
 update' s Render                     = Transition s $ do
