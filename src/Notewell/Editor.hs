@@ -17,7 +17,8 @@ import           Notewell.Events                ( Event(..) )
 import           Notewell.Renderer              ( markdownTextTagTable )
 import           Notewell.Theming               ( Theme )
 import           Notewell.Renderer
-import           Notewell.Helpers (whenM)
+import           Notewell.Metrics
+import           Notewell.Helpers               ( whenM )
 import qualified GI.Gtk.Declarative            as D
 import qualified GI.Gtk.Declarative.Widget     as D
 import qualified GI.Gtk.Declarative.State      as D
@@ -45,10 +46,11 @@ markdownEditor attrs params = D.Widget $ D.CustomWidget { customAttributes = att
  where
   customWidget = TextView
   customCreate EditorParams {..} = do
-    textView   <- new TextView []
+    textView <- new TextView []
     #setBuffer textView $ Just editorBuffer
     return (textView, editorBuffer)
   customPatch _ _ _ = D.CustomKeep
-  customSubscribe _ (buffer :: TextBuffer) textview f = do
-    shId <- on buffer #endUserAction $ f Render 
-    return (fromCancellation $ signalHandlerDisconnect buffer shId)
+  customSubscribe _ (buffer :: TextBuffer) (textView :: TextView) f = do
+    counts  <- count buffer
+    editShId <- on buffer #changed $ f $ UpdateMetrics $ Metrics { counts = counts }
+    return $ fromCancellation $ signalHandlerDisconnect buffer editShId

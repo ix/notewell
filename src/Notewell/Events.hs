@@ -7,7 +7,8 @@
 -}
 module Notewell.Events where
 
-import GI.Gtk (TextBuffer)
+import           GI.Gtk                         ( TextBuffer )
+import           Notewell.Metrics               ( Metrics )
 
 data Event = Closed                            -- ^ The window was closed.
            | OpenFileSelected (Maybe FilePath) -- ^ An open target was selected in the FileChooser.
@@ -15,4 +16,5 @@ data Event = Closed                            -- ^ The window was closed.
            | OpenClicked                       -- ^ The open button was clicked.
            | SaveClicked                       -- ^ The save button was clicked.
            | SaveFileSelected (Maybe FilePath) -- ^ A save target was selected in the FileChooser.
-           | Render                            -- ^ A change was made to the buffer.
+           | UpdateMetrics Metrics             -- ^ The buffer was updated and analyzed.
+           | Render                            -- ^ The Markdown needs re-rendering.
