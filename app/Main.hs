@@ -29,7 +29,7 @@ import           GI.Gtk.Declarative.App.Simple
 import           Notewell.Renderer
 import           Notewell.Theming
 import           Notewell.Theming.CSS
-import           Notewell.Metrics
+import qualified Notewell.Metrics              as M
 import           Notewell.Editor
 import           Notewell.Events                ( Event(..) )
 import           Notewell.Helpers               ( whenM )
@@ -39,14 +39,15 @@ import           System.Environment             ( getExecutablePath
                                                 )
 import           Paths_notewell
 import           Control.Arrow
-import           Control.Monad.Trans.State
+import           Control.Monad.Trans.State.Strict
 import           Data.Int                       ( Int32 )
 import           Data.Either                    ( fromRight )
 
 data Screen = Welcome | Editing
 
 data Luggage = Luggage { screen         :: Screen
-                       , editorParams   :: EditorParams }
+                       , editorParams   :: EditorParams
+                       , metrics        :: M.Metrics }
 
 type AppState a = State Luggage a
 
@@ -86,6 +87,8 @@ expandableChild = BoxChild defaultBoxChildProperties { expand = True, fill = Tru
 -- | Simply a shorthand for the toolbar component.
 toolbar :: AppState (BoxChild Event)
 toolbar = do
+  textBuffer <- gets (editorBuffer . editorParams)
+  metrics'   <- gets metrics
   return $ container
     Gtk.Box
     [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
@@ -96,6 +99,7 @@ toolbar = do
           return $ SaveFileSelected filename
         , #label := "Save"
         ]
+    , expandableChild $ widget Gtk.Label [#label := M.formatCounts metrics', #halign := Gtk.AlignEnd]
     ]
 
 -- | Used as a callback with afterCreated to set the icon of a ToolButton.
@@ -158,7 +162,8 @@ update' s (OpenFileSelected (Just file)) = Transition s { screen = Editing } $ d
     return False
   return $ Just Render
 update' s (OpenFileSelected Nothing) = Transition s { screen = Editing } $ return Nothing
-update' s Render                     = Transition s { screen = Editing } $ do
+update' s (UpdateMetrics    m)       = Transition s { metrics = m } $ return $ Just Render
+update' s Render                     = Transition s $ do
   void $ idleAdd GLib.PRIORITY_HIGH_IDLE $ do
     renderMarkdown $ (editorBuffer . editorParams) s
     return False
@@ -188,11 +193,13 @@ startWithTheme theme = do
   textTagTable <- markdownTextTagTable theme
   globalBuffer <- Gtk.new Gtk.TextBuffer [#tagTable Gtk.:= textTagTable]
 
-  let app = App { view         = evalState view'
-                , update       = update'
-                , inputs       = []
-                , initialState = Luggage Welcome $ EditorParams { editorTheme = theme, editorBuffer = globalBuffer }
-                }
+  let
+    app = App
+      { view         = evalState view'
+      , update       = update'
+      , inputs       = []
+      , initialState = Luggage Welcome (EditorParams { editorTheme = theme, editorBuffer = globalBuffer }) M.empty
+      }
 
   case settings of
     Just settings' -> do

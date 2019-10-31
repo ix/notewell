@@ -73,14 +73,15 @@ buildCSS theme =
 \    text-shadow: none;\
 \    color: " ++ fgColor ++ ";\
 \    border-radius: 0px;\
-\    padding: 0em 1em 0em 1em;\
+\    padding: 0em 0.5em 0em 0.5em;\
 \}\
 \.toolbar button:hover {\
 \    background: " ++ border ++ ";\
 \    color: @accent_color;\
 \    transition: color 0.5s;\
 \}\
-\.toolbar button:active { background: " ++ border ++ "; }"
+\.toolbar button:active { background: " ++ border ++ "; }\
+\.toolbar label { padding: 0em 1em 0em 1em; }"
  where
   (++)    = append
   bgColor = encodeUtf8 $ background theme
