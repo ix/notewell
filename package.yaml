@@ -1,5 +1,5 @@
 name:                notewell
-version:             0.2.0.0
+version:             1.0.0.0
 github:              "ix/notewell"
 license:             BSD3
 author:              "Rose"
@@ -62,11 +62,13 @@ executables:
           - -rtsopts
           - -with-rtsopts=-N
           - -optl-mwindows
+          - -O2
         else:
           ghc-options:
           - -threaded
           - -rtsopts
           - -with-rtsopts=-N
+          - -O2
     dependencies:
     - notewell
     other-modules:
