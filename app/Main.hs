@@ -100,7 +100,6 @@ toolbar = do
         , #label := "Save"
         ]
     , expandableChild $ widget Gtk.Label [#label := M.formatCounts metrics', #halign := Gtk.AlignEnd]
-    , expandableChild $ widget Gtk.Switch [#margin := 10, #state := True]
     ]
 
 -- | Used as a callback with afterCreated to set the icon of a ToolButton.
