@@ -77,7 +77,8 @@ buildCSS theme = encodeUtf8 $ [st|
       transition: color 0.5s;
   }
   .toolbar button:active { background: #{border}; }
-  .toolbar label { padding: 0em 1em 0em 1em; } 
+  .toolbar label { padding: 0em 1em 0em 1em; }
+  switch { margin: 0.3rem; }
  |]
  where
   bgColor = background theme

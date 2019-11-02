@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedLabels  #-}
 {-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections     #-}
 
 {- |
-
  Module : Main
  Description : Main module. 
  Copyright : Rose <rose@empty.town>
@@ -31,13 +31,15 @@ import           Notewell.Theming
 import           Notewell.Theming.CSS
 import qualified Notewell.Metrics              as M
 import           Notewell.Editor
-import           Notewell.Events                ( Event(..) )
+import           Notewell.Events                ( Event(..)
+                                                , ThemeType(..)
+                                                , fromBool
+                                                )
 import           Notewell.Helpers               ( whenM )
 import           System.FilePath.Posix
 import           System.Environment             ( getExecutablePath
                                                 , getArgs
                                                 )
-import           Paths_notewell
 import           Control.Arrow
 import           Control.Monad.Trans.State.Strict
 import           Data.Int                       ( Int32 )
@@ -89,17 +91,19 @@ toolbar :: AppState (BoxChild Event)
 toolbar = do
   textBuffer <- gets (editorBuffer . editorParams)
   metrics'   <- gets metrics
+  themeState <- isDark <$> gets (editorTheme . editorParams)
   return $ container
     Gtk.Box
     [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
     [ widget
-        Gtk.Button
-        [ onM #clicked $ \button -> do
-          filename <- spawnFileDialog Gtk.FileChooserActionSave button
-          return $ SaveFileSelected filename
-        , #label := "Save"
-        ]
+      Gtk.Button
+      [ onM #clicked $ \button -> do
+        filename <- spawnFileDialog Gtk.FileChooserActionSave button
+        return $ SaveFileSelected filename
+      , #label := "Save"
+      ]
     , expandableChild $ widget Gtk.Label [#label := M.formatCounts metrics', #halign := Gtk.AlignEnd]
+    , widget Gtk.Switch [#state := themeState, on #stateSet $ (False,) . ToggleTheme . fromBool]
     ]
 
 -- | Used as a callback with afterCreated to set the icon of a ToolButton.
@@ -155,8 +159,8 @@ update' s (SaveFileSelected (Just file)) = Transition s { screen = Editing } $ d
   return $ Just Render
 update' s (SaveFileSelected Nothing    ) = Transition s { screen = Editing } $ return Nothing
 update' s (OpenFileSelected (Just file)) = Transition s { screen = Editing } $ do
-  let buffer = (editorBuffer . editorParams) s 
-  
+  let buffer = (editorBuffer . editorParams) s
+
   -- Wait on redraw operations before it's safe to modify the buffer.
   void $ idleAdd GLib.PRIORITY_HIGH_IDLE $ do
     contents <- T.readFile file
@@ -166,24 +170,46 @@ update' s (OpenFileSelected (Just file)) = Transition s { screen = Editing } $ d
   newCounts <- M.count buffer
   return $ Just $ UpdateMetrics $ M.Metrics { M.counts = newCounts }
 update' s (OpenFileSelected Nothing) = Transition s { screen = Editing } $ return Nothing
-update' s (UpdateMetrics    m)       = Transition s { metrics = m } $ return $ Just Render
+update' s (UpdateMetrics    m      ) = Transition s { metrics = m } $ return $ Just Render
 update' s Render                     = Transition s $ do
   void $ idleAdd GLib.PRIORITY_HIGH_IDLE $ do
     renderMarkdown $ (editorBuffer . editorParams) s
     return False
   return Nothing
-update' _ _ = Exit
+update' s (ToggleTheme t) = Transition s $ setDefaultTheme t >> return (Just Render)
+update' _ _               = Exit
+
+-- | Call a monadic action with GTK settings, only if available.
+withSettings :: (Gtk.Settings -> IO ()) -> IO ()
+withSettings action = Gtk.settingsGetDefault >>= (flip whenM) action
+
+-- | Set the default light or dark theme according to a ThemeType.
+setDefaultTheme :: ThemeType -> IO ()
+setDefaultTheme Light = withSettings <$> setTheme =<< fromRight defaultTheme <$> readTheme ("themes" </> "giorno.json")
+setDefaultTheme Dark  = withSettings <$> setTheme =<< fromRight defaultTheme <$> readTheme ("themes" </> "notte.json")
+
+-- | Set a Theme application-wide.
+setTheme :: Theme -> Gtk.Settings -> IO ()
+setTheme theme settings = do
+  provider    <- Gtk.cssProviderNew
+  maybeScreen <- maybe Nothing Just <$> Gdk.screenGetDefault
+  whenM maybeScreen $ \screen -> do
+    void . idleAdd GLib.PRIORITY_LOW $ do
+      Gtk.cssProviderLoadFromData provider $ buildCSS theme
+      Gtk.styleContextAddProviderForScreen screen provider (fromIntegral Gtk.STYLE_PROVIDER_PRIORITY_USER)
+      Gtk.setSettingsGtkApplicationPreferDarkTheme settings $ isDark theme
+      return False
 
 main :: IO ()
 main = getArgs >>= parseOpts
 
 parseOpts :: [String] -> IO ()
 parseOpts ("--theme" : themeName : _) = do
-  path  <- getDataFileName ("themes" </> themeName <.> "json")
+  let path = "themes" </> themeName <.> "json"
   theme <- fromRight defaultTheme <$> readTheme path
   startWithTheme theme
 parseOpts _ = do
-  path  <- getDataFileName ("themes" </> "giorno" <.> "json")
+  let path = "themes" </> "giorno" <.> "json"
   theme <- fromRight defaultTheme <$> readTheme path
   startWithTheme theme
 
@@ -191,28 +217,19 @@ startWithTheme :: Theme -> IO ()
 startWithTheme theme = do
   void $ Gtk.init Nothing
 
-  provider     <- Gtk.cssProviderNew
-  settings     <- Gtk.settingsGetDefault
-  gtkScreen    <- maybe (fail "No screen?") return =<< Gdk.screenGetDefault
   textTagTable <- markdownTextTagTable theme
   globalBuffer <- Gtk.new Gtk.TextBuffer [#tagTable Gtk.:= textTagTable]
 
-  let
-    app = App
-      { view         = evalState view'
-      , update       = update'
-      , inputs       = []
-      , initialState = Luggage Welcome (EditorParams { editorTheme = theme, editorBuffer = globalBuffer }) M.empty
-      }
+  let app = App
+        { view         = evalState view'
+        , update       = update'
+        , inputs       = []
+        , initialState = Luggage Welcome (EditorParams { editorTheme = theme, editorBuffer = globalBuffer }) M.empty
+        }
 
-  case settings of
-    Just settings' -> do
-      Gtk.setSettingsGtkCursorBlink settings' False
-      when (isDark theme) $ Gtk.setSettingsGtkApplicationPreferDarkTheme settings' True
-    Nothing -> return ()
-
-  Gtk.cssProviderLoadFromData provider $ buildCSS theme
-  Gtk.styleContextAddProviderForScreen gtkScreen provider (fromIntegral Gtk.STYLE_PROVIDER_PRIORITY_USER)
+  withSettings $ \settings -> do
+    setTheme theme settings
+    Gtk.setSettingsGtkCursorBlink settings False
 
   void . async $ do
     void $ runLoop app
