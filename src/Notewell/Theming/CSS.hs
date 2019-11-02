@@ -8,6 +8,7 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Notewell.Theming.CSS where
 
@@ -18,10 +19,10 @@ import           Data.ByteString.Char8
 import           Text.Shakespeare.Text
 
 buildCSS :: Theme -> ByteString
-buildCSS theme = encodeUtf8 $ [st|
-  @define-color bg_color #{bgColor};
-  @define-color accent_color #{acColor};
-  @define-color fg_color #{fgColor};
+buildCSS Theme {..} = encodeUtf8 $ [st|
+  @define-color bg_color #{background};
+  @define-color accent_color #{accent};
+  @define-color fg_color #{foreground};
   .intro button {
       border: none;
       border-radius: 0px;
@@ -39,7 +40,7 @@ buildCSS theme = encodeUtf8 $ [st|
   }
   scrolledwindow { background: @bg_color; }
   .editor {
-      font-family: #{bf};
+      font-family: #{bodyFont};
       font-size: 1.25em;
       background: @bg_color;
       caret-color: @accent_color;
@@ -59,33 +60,26 @@ buildCSS theme = encodeUtf8 $ [st|
       color: @bg_color;
   }
   .toolbar { 
-      background: #{toolbar};
-      border-top: 1px solid #{border};
+      background: #{toolbarColor};
+      border-top: 1px solid #{borderColor};
   }
   .toolbar button {
       background: none;
       border: none;
       box-shadow: none;
       text-shadow: none;
-      color: #{fgColor};
+      color: #{foreground};
       border-radius: 0px;
       padding: 0em 0.5em 0em 0.5em;
   }
   .toolbar button:hover {
-      background: #{border};
+      background: #{borderColor};
       color: @accent_color;
       transition: color 0.5s;
   }
-  .toolbar button:active { background: #{border}; }
+  .toolbar button:active { background: #{borderColor}; }
   .toolbar label { padding: 0em 1em 0em 1em; }
   switch { margin: 0.3rem; }
   window decoration, window headerbar.titlebar, window headerbar { border-radius: 0px; }
-  headerbar { border: none; background: #{bgColor}; }
+  headerbar { border: none; background: #{background}; }
  |]
- where
-  bgColor = background theme
-  fgColor = foreground theme
-  acColor = accent theme
-  toolbar = toolbarColor theme
-  border  = borderColor theme
-  bf      = bodyFont theme
