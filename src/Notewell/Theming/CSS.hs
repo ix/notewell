@@ -63,7 +63,7 @@ buildCSS theme = encodeUtf8 $ [st|
       border-top: 1px solid #{border};
   }
   .toolbar button {
-      background: #{toolbar};
+      background: none;
       border: none;
       box-shadow: none;
       text-shadow: none;
@@ -79,6 +79,8 @@ buildCSS theme = encodeUtf8 $ [st|
   .toolbar button:active { background: #{border}; }
   .toolbar label { padding: 0em 1em 0em 1em; }
   switch { margin: 0.3rem; }
+  window decoration, window headerbar.titlebar, window headerbar { border-radius: 0px; }
+  headerbar { border: none; background: #{bgColor}; }
  |]
  where
   bgColor = background theme
