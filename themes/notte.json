@@ -1,45 +1,47 @@
 { 
-  "background": "#252526",
-  "foreground": "#f8f8f8",
-  "toolbarColor": "#222",
-  "borderColor": "#111",
-  "accent": "#eb2f7d",
-  "bodyFont": "Lato",
-  "isDark": true,
-  "heading": {
-    "weight": "heavy"
-  },
-  "emph": {
-    "style": "italic"
-  },
-  "strong": {
-    "weight": "heavy"
-  },
-  "code": {
-    "font": "Consolas",
-    "color": "#afafbf"
-  },
-  "codeBlock": {
-    "font": "Consolas",
-    "color": "#afafbf"
-  },
-  "strikethrough": {
-    "strikethrough": true
-  },
-  "thematicBreak": {
-    "color": "#eb2f7d",
-    "scale": 2.0,
-    "justification": "center"
-  },
-  "list": {
-    "indent": 15,
-    "color": "#afafbf"
-  },
-  "blockquote": {
-    "style": "italic",
-    "indent": 30,
-    "color": "#afafbf",
-    "font": "Cambria",
-    "weight": "bold"
-  }
+    "background": "#252526",
+    "foreground": "#f8f8f8",
+    "toolbarColor": "#222",
+    "borderColor": "#111",
+    "accent": "#eb2f7d",
+    "bodyFont": "Lato",
+    "isDark": true,
+    "elements": {
+	"heading": [
+	    {"weight": "heavy"}
+	],
+	"emph": [
+	    {"style": "italic"}
+	],
+	"strong": [
+	    {"weight": "heavy"}
+	],
+	"code": [
+	    {"font": "Consolas"},
+	    {"color": "#afafbf"}
+	],
+	"codeBlock": [
+	    {"font": "Consolas"},
+	    {"color": "#afafbf"}
+	],
+	"strikethrough": [
+	    {"strikethrough": true}
+	],
+	"thematicBreak": [
+	    {"color": "#eb2f7d"},
+	    {"scale": 2.0},
+	    {"justification": "center"}
+	],
+	"list": [
+	    {"indent": 15},
+	    {"color": "#afafbf"}
+	],
+	"blockquote": [
+	    {"style": "italic"},
+	    {"indent": 30},
+	    {"color": "#afafbf"},
+	    {"font": "Cambria"},
+	    {"weight": "bold"}
+	]
+    }
 }

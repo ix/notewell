@@ -12,20 +12,18 @@ module Notewell.Theming where
 
 import           Data.Aeson
 import           Data.Text                      ( Text )
+import Control.Applicative                      ( (<|>) )
 import           GHC.Generics
 import           GI.Pango.Enums
 import           GI.Gtk.Enums
 import           Data.Int                       ( Int32 )
+import qualified Data.HashMap.Strict           as HM
+import qualified Data.HashSet                  as HS
 
-data TagProperties = TagProperties { color  :: Maybe Text
-                                   , font   :: Maybe Text
-                                   , scale  :: Maybe Double
-                                   , style  :: Maybe Style
-                                   , weight :: Maybe Weight
-                                   , indent :: Maybe Int32
-                                   , strike :: Maybe Bool
-                                   , justification :: Maybe Justification }
-  deriving (Generic, Show, Eq)
+data TagProperty = Color Text | Font Text | Scale Double | Style Style | Weight Weight | Indent Int32 | Strike Bool | Justification Justification
+  deriving (Generic, Eq, Ord)
+
+type TagProperties = [TagProperty]
 
 data Theme = Theme { background    :: Text
                    , foreground    :: Text
@@ -34,16 +32,24 @@ data Theme = Theme { background    :: Text
                    , accent        :: Text
                    , bodyFont      :: Text
                    , isDark        :: Bool
-                   , emph          :: TagProperties
-                   , strong        :: TagProperties
-                   , code          :: TagProperties
-                   , codeBlock     :: TagProperties
-                   , strikethrough :: TagProperties
-                   , thematicBreak :: TagProperties
-                   , list          :: TagProperties
-                   , blockquote    :: TagProperties
-                   , heading       :: TagProperties }
-  deriving (Generic, Show, Eq)
+                   , elements      :: !(HM.HashMap Text TagProperties) }
+  deriving (Generic, Eq)
+
+instance FromJSON TagProperty where
+  parseJSON = withObject "TagProperty" $ \v ->
+    (Color         <$> v .: "color")         <|>
+    (Font          <$> v .: "font")          <|>
+    (Scale         <$> v .: "scale")         <|>
+    (Style         <$> v .: "style")         <|>
+    (Weight        <$> v .: "weight")        <|>
+    (Indent        <$> v .: "indent")        <|>
+    (Strike        <$> v .: "strikethrough") <|>
+    (Justification <$> v .: "justification")
+
+instance ToJSON TagProperty
+
+instance ToJSON Theme
+instance FromJSON Theme
 
 instance FromJSON Justification where
   parseJSON (String t) = return $ case t of
@@ -101,39 +107,17 @@ instance ToJSON Style where
     StyleOblique -> "oblique"
     StyleNormal  -> "normal"
 
-instance FromJSON TagProperties
-instance ToJSON TagProperties
-
-instance ToJSON Theme
-instance FromJSON Theme
-
 readTheme :: FilePath -> IO (Either String Theme)
 readTheme = eitherDecodeFileStrict
 
 defaultTheme :: Theme
-defaultTheme = Theme { foreground    = "black"
-                     , background    = "white"
-                     , toolbarColor  = "grey"
-                     , borderColor   = "darkgrey"
-                     , accent        = "red"
-                     , bodyFont      = "Sans"
-                     , isDark        = False
-                     , emph          = blank
-                     , strong        = blank
-                     , code          = blank
-                     , codeBlock     = blank
-                     , strikethrough = blank
-                     , thematicBreak = blank
-                     , list          = blank
-                     , blockquote    = blank
-                     , heading       = blank
+defaultTheme = Theme { foreground   = "black"
+                     , background   = "white"
+                     , toolbarColor = "grey"
+                     , borderColor  = "darkgrey"
+                     , accent       = "red"
+                     , bodyFont     = "Sans"
+                     , isDark       = False
+                     , elements     = HM.empty
                      }
- where
-  blank = TagProperties Nothing
-                        Nothing
-                        Nothing
-                        Nothing
-                        Nothing
-                        Nothing
-                        Nothing
-                        Nothing
+

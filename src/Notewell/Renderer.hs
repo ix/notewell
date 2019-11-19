@@ -17,10 +17,12 @@ import           Data.Text                      ( Text )
 import qualified Data.Text.Encoding            as T
 import qualified Data.Text                     as T
 import           CMarkGFM
-import           GI.Gtk
+import           GI.Gtk                        hiding (Style, Weight, Justification, Scale)
 import           Control.Monad
 import           Notewell.Theming
 import           Notewell.Helpers               ( whenM )
+import           Data.Maybe (catMaybes, fromMaybe)
+import qualified Data.HashMap.Strict as HM
 
 -- | Clear a TextBuffer of all styling tags.
 removeAllTags :: TextBuffer -> IO ()
@@ -40,10 +42,9 @@ applyAllTags textBuffer = do
 -- TextIter begins at 0 whereas PosInfo begins at 1, so we decrement.
 applyTag :: TextBuffer -> PosInfo -> Text -> IO ()
 applyTag buffer (PosInfo sl' sc' el' ec') tag = do
-  s <- textBufferGetIterAtLineOffset buffer sl sc
-  e <- textBufferGetIterAtLineOffset buffer el ec
-  textBufferApplyTagByName buffer tag s e
-  return ()
+  s <- #getIterAtLineOffset buffer sl sc
+  e <- #getIterAtLineOffset buffer el ec
+  #applyTagByName buffer tag s e
  where
   sl = fromIntegral $ pred sl'
   sc = fromIntegral $ pred sc'
@@ -63,6 +64,9 @@ applyNode buffer (Node (Just pos) (CODE_BLOCK _ _) _       ) = applyTag buffer p
 applyNode buffer (Node (Just pos) (HEADING level ) children) = do
   applyTag buffer pos $ T.concat ["heading", T.pack $ show level]
   mapM_ (applyNode buffer) children
+applyNode buffer (Node (Just urlPos) (LINK url _) [(Node (Just textPos) (TEXT content) _)]) = do
+  applyTag buffer textPos "linkText"
+  applyTag buffer urlPos "linkUrl" -- has wrong columns
 applyNode buffer (Node (Just pos) STRIKETHROUGH children) = do
   applyTag buffer pos "strikethrough"
   mapM_ (applyNode buffer) children
@@ -82,31 +86,33 @@ applyNode buffer (Node _ _        children) = mapM_ (applyNode buffer) children
 markdownTextTagTable :: Theme -> IO TextTagTable
 markdownTextTagTable theme = do
   table <- textTagTableNew
-  mapM_ (textTagTableAdd table <=< uncurry mkTag) zipped
-  mapM_ (textTagTableAdd table =<<) $ map (mkHeadingTag $ heading theme) [1 .. 6]
+  mapM_ (textTagTableAdd table <=< uncurry mkTag) $ HM.toList $ elements theme 
+  mapM_ (textTagTableAdd table =<<) $ map (mkHeadingTag heading) [1 .. 6]
   return table
  where
-  zipped       = zip (map Just names) (map ($ theme) constructors)
-  names        = ["emph", "strong", "code", "codeBlock", "strikethrough", "thematicBreak", "list", "blockquote"]
-  constructors = [emph, strong, code, codeBlock, strikethrough, thematicBreak, list, blockquote]
+  heading      = fromMaybe mempty $ HM.lookup "heading" $ elements theme
 
--- | Given an optional name and some TagProperties, produce a TextTag.
-mkTag :: Maybe Text -> TagProperties -> IO TextTag
+-- | Given a name and some TagProperties, produce a TextTag.
+mkTag :: Text -> TagProperties -> IO TextTag
 mkTag name properties = do
-  tag <- textTagNew name
-  whenM (font properties) $ setTextTagFamily tag
-  whenM (color properties) $ setTextTagForeground tag
-  whenM (scale properties) $ setTextTagScale tag
-  whenM (style properties) $ setTextTagStyle tag
-  whenM (weight properties) $ setTextTagWeight tag . fromIntegral . fromEnum
-  whenM (indent properties) $ setTextTagIndent tag
-  whenM (justification properties) $ setTextTagJustification tag
+  tag <- textTagNew $ Just name
+  mapM_ (`apply` tag) properties
   return tag
+  where
+    apply :: TagProperty -> TextTag -> IO ()
+    apply (Color color)        = flip setTextTagForeground color
+    apply (Font font)          = flip setTextTagFamily font
+    apply (Scale scale)        = flip setTextTagScale scale
+    apply (Style style)        = flip setTextTagStyle style
+    apply (Weight weight)      = flip setTextTagWeight (fromIntegral $ fromEnum weight)
+    apply (Indent indent)      = flip setTextTagIndent indent
+    apply (Strike strike)      = flip setTextTagStrikethrough strike
+    apply (Justification j11n) = flip setTextTagJustification j11n
 
 -- | Create a heading tag of a given level.
 mkHeadingTag :: TagProperties -> Level -> IO TextTag
 mkHeadingTag properties level = do
-  tag <- mkTag (Just $ T.pack $ "heading" ++ show level) properties
+  tag <- mkTag (T.pack $ "heading" ++ show level) properties
   setTextTagScale tag $ scaling $ level
   return tag
  where
