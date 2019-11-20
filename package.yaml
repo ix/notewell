@@ -44,7 +44,6 @@ dependencies:
 - gi-gtk-declarative            >= 0.6.0 && < 0.7
 - gi-gtk-declarative-app-simple >= 0.6.0 && < 0.7
 - shakespeare                   >= 2.0.22 && < 2.1
-- unordered-containers
 
 library:
   source-dirs: src

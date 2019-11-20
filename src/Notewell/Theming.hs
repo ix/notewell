@@ -12,16 +12,22 @@ module Notewell.Theming where
 
 import           Data.Aeson
 import           Data.Text                      ( Text )
-import Control.Applicative                      ( (<|>) )
+import           Control.Applicative            ( (<|>) )
 import           GHC.Generics
 import           GI.Pango.Enums
 import           GI.Gtk.Enums
 import           Data.Int                       ( Int32 )
 import qualified Data.HashMap.Strict           as HM
-import qualified Data.HashSet                  as HS
 
-data TagProperty = Color Text | Font Text | Scale Double | Style Style | Weight Weight | Indent Int32 | Strike Bool | Justification Justification
-  deriving (Generic, Eq, Ord)
+data TagProperty = Color Text
+                 | Font Text
+                 | Scale Double
+                 | Style Style
+                 | Weight Weight
+                 | Indent Int32
+                 | Strike Bool
+                 | Justification Justification
+  deriving (Generic, Eq)
 
 type TagProperties = [TagProperty]
 

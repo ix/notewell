@@ -35,8 +35,8 @@ removeAllTags textBuffer = do
 applyAllTags :: TextBuffer -> IO ()
 applyAllTags textBuffer = do
   maybeContent <- get textBuffer #text
-  whenM maybeContent $ \content -> do
-    applyNode textBuffer $ (commonmarkToNode [] [extStrikethrough] content)
+  whenM maybeContent $ \content ->
+    applyNode textBuffer $ commonmarkToNode [] [extStrikethrough] content
 
 -- | Apply a TextTag to a TextBuffer at the location from a PosInfo.
 -- TextIter begins at 0 whereas PosInfo begins at 1, so we decrement.
@@ -49,7 +49,7 @@ applyTag buffer (PosInfo sl' sc' el' ec') tag = do
   sl = fromIntegral $ pred sl'
   sc = fromIntegral $ pred sc'
   el = fromIntegral $ pred el'
-  ec = fromIntegral $ ec'
+  ec = fromIntegral ec'
 
 -- | Traverses a Node and applies formatting tags to a buffer accordingly.
 applyNode :: TextBuffer -> Node -> IO ()
@@ -64,7 +64,7 @@ applyNode buffer (Node (Just pos) (CODE_BLOCK _ _) _       ) = applyTag buffer p
 applyNode buffer (Node (Just pos) (HEADING level ) children) = do
   applyTag buffer pos $ T.concat ["heading", T.pack $ show level]
   mapM_ (applyNode buffer) children
-applyNode buffer (Node (Just urlPos) (LINK url _) [(Node (Just textPos) (TEXT content) _)]) = do
+applyNode buffer (Node (Just urlPos) (LINK url _) [Node (Just textPos) (TEXT content) _]) = do
   applyTag buffer textPos "linkText"
   applyTag buffer urlPos "linkUrl" -- has wrong columns
 applyNode buffer (Node (Just pos) STRIKETHROUGH children) = do
@@ -87,7 +87,7 @@ markdownTextTagTable :: Theme -> IO TextTagTable
 markdownTextTagTable theme = do
   table <- textTagTableNew
   mapM_ (textTagTableAdd table <=< uncurry mkTag) $ HM.toList $ elements theme 
-  mapM_ (textTagTableAdd table =<<) $ map (mkHeadingTag heading) [1 .. 6]
+  mapM_ ((textTagTableAdd table =<<) . mkHeadingTag heading) [1 .. 6]
   return table
  where
   heading      = fromMaybe mempty $ HM.lookup "heading" $ elements theme
@@ -113,7 +113,7 @@ mkTag name properties = do
 mkHeadingTag :: TagProperties -> Level -> IO TextTag
 mkHeadingTag properties level = do
   tag <- mkTag (T.pack $ "heading" ++ show level) properties
-  setTextTagScale tag $ scaling $ level
+  setTextTagScale tag $ scaling level
   return tag
  where
   scaling n | n <= 1    = 3

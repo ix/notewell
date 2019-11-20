@@ -14,7 +14,7 @@ import           GI.Gtk
 import qualified Data.Text                     as T
 
 -- | Data gathered from analyzing a TextBuffer.
-data Metrics = Metrics { counts :: (Int, Int, Int) }
+newtype Metrics = Metrics { counts :: (Int, Int, Int) }
 
 -- | Default buffer metrics.
 empty :: Metrics

@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedLabels #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -16,7 +15,6 @@ module Notewell.Editor where
 import           Notewell.Events                ( Event(..) )
 import           Notewell.Renderer              ( markdownTextTagTable )
 import           Notewell.Theming               ( Theme )
-import           Notewell.Renderer
 import           Notewell.Metrics
 import           Notewell.Helpers               ( whenM )
 import qualified GI.Gtk.Declarative            as D

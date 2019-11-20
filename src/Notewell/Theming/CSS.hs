@@ -19,7 +19,7 @@ import           Data.ByteString.Char8
 import           Text.Shakespeare.Text
 
 buildCSS :: Theme -> ByteString
-buildCSS Theme {..} = encodeUtf8 $ [st|
+buildCSS Theme {..} = encodeUtf8 [st|
   @define-color bg_color #{background};
   @define-color accent_color #{accent};
   @define-color fg_color #{foreground};

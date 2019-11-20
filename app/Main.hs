@@ -80,7 +80,7 @@ spawnFileDialog action invoker = do
 
 -- | Render Markdown based on the content of a TextBuffer.
 renderMarkdown :: Gtk.TextBuffer -> IO ()
-renderMarkdown = fmap void $ runKleisli (Kleisli removeAllTags &&& Kleisli applyAllTags)
+renderMarkdown = void <$> runKleisli (Kleisli removeAllTags &&& Kleisli applyAllTags)
 
 -- | Place a widget inside a BoxChild and allow it to expand.
 expandableChild :: Widget a -> BoxChild a
@@ -134,21 +134,21 @@ view' = do
     $ case s of
         Welcome ->
           container Gtk.Box [#orientation := Gtk.OrientationHorizontal]
-            $ [ expandableChild $ widget
-                Gtk.ToolButton
-                [afterCreated $ setIcon 64 iconNewFile, on #clicked NewClicked, classes ["intro"]]
-              , expandableChild $ widget
-                Gtk.ToolButton
-                [ afterCreated $ setIcon 64 iconFolderOpened
-                , onM #clicked $ \button -> do
-                  filename <- spawnFileDialog Gtk.FileChooserActionOpen button
-                  return $ OpenFileSelected filename
-                , classes ["intro"]
-                ]
-              ]
+          [ expandableChild $ widget
+            Gtk.ToolButton
+            [afterCreated $ setIcon 64 iconNewFile, on #clicked NewClicked, classes ["intro"]]
+          , expandableChild $ widget
+            Gtk.ToolButton
+            [ afterCreated $ setIcon 64 iconFolderOpened
+            , onM #clicked $ \button -> do
+                filename <- spawnFileDialog Gtk.FileChooserActionOpen button
+                return $ OpenFileSelected filename
+            , classes ["intro"]
+            ]
+          ]
         Editing ->
           container Gtk.Box [#orientation := Gtk.OrientationVertical]
-            $ [expandableChild $ bin Gtk.ScrolledWindow [] $ editorHelper params, toolbar']
+          [ expandableChild $ bin Gtk.ScrolledWindow [] $ editorHelper params, toolbar' ]
 
 -- | Perform state transitions.
 update' :: Luggage -> Event -> Transition Luggage Event
@@ -181,7 +181,7 @@ update' _ _               = Exit
 
 -- | Call a monadic action with GTK settings, only if available.
 withSettings :: (Gtk.Settings -> IO ()) -> IO ()
-withSettings action = Gtk.settingsGetDefault >>= (flip whenM) action
+withSettings action = Gtk.settingsGetDefault >>= flip whenM action
 
 -- | Set the default light or dark theme according to a ThemeType.
 setDefaultTheme :: ThemeType -> IO ()
@@ -193,7 +193,7 @@ setTheme :: Theme -> Gtk.Settings -> IO ()
 setTheme theme settings = do
   provider    <- Gtk.cssProviderNew
   maybeScreen <- maybe Nothing Just <$> Gdk.screenGetDefault
-  whenM maybeScreen $ \screen -> do
+  whenM maybeScreen $ \screen ->
     void . idleAdd GLib.PRIORITY_LOW $ do
       Gtk.cssProviderLoadFromData provider $ buildCSS theme
       Gtk.styleContextAddProviderForScreen screen provider (fromIntegral Gtk.STYLE_PROVIDER_PRIORITY_USER)
