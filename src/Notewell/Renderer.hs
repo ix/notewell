@@ -12,17 +12,17 @@
 
 module Notewell.Renderer where
 
-import qualified Data.ByteString               as BS
-import           Data.Text                      ( Text )
-import qualified Data.Text.Encoding            as T
-import qualified Data.Text                     as T
 import           CMarkGFM
-import           GI.Gtk                        hiding (Style, Weight, Justification, Scale)
 import           Control.Monad
-import           Notewell.Theming
-import           Notewell.Helpers               ( whenM )
-import           Data.Maybe (catMaybes, fromMaybe)
+import qualified Data.ByteString               as BS
 import qualified Data.HashMap.Strict as HM
+import           Data.Maybe (catMaybes, fromMaybe)
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import qualified Data.Text.Encoding            as T
+import           GI.Gtk                        hiding (Style, Weight, Justification, Scale)
+import           Notewell.Helpers               ( whenM )
+import           Notewell.Theming
 
 -- | Clear a TextBuffer of all styling tags.
 removeAllTags :: TextBuffer -> IO ()
@@ -50,6 +50,13 @@ applyTag buffer (PosInfo sl' sc' el' ec') tag = do
   sc = fromIntegral $ pred sc'
   el = fromIntegral $ pred el'
   ec = fromIntegral ec'
+  
+-- | Adjust the PosInfo of the text & url components of a LINK node.
+-- This is used for providing nicer rendering.
+adjustLinkPosInfo :: (PosInfo, PosInfo) -> (PosInfo, PosInfo)
+adjustLinkPosInfo (textPos, urlPos) = (textPos, urlPos')
+  where urlPos' = urlPos { startColumn = endColumn textPos + 3
+                         , endColumn   = endColumn urlPos - 1 }
 
 -- | Traverses a Node and applies formatting tags to a buffer accordingly.
 applyNode :: TextBuffer -> Node -> IO ()
@@ -66,7 +73,7 @@ applyNode buffer (Node (Just pos) (HEADING level ) children) = do
   mapM_ (applyNode buffer) children
 applyNode buffer (Node (Just urlPos) (LINK url _) [Node (Just textPos) (TEXT content) _]) = do
   applyTag buffer textPos "linkText"
-  applyTag buffer urlPos "linkUrl" -- has wrong columns
+  applyTag buffer (snd $ adjustLinkPosInfo (textPos, urlPos)) "linkUrl"
 applyNode buffer (Node (Just pos) STRIKETHROUGH children) = do
   applyTag buffer pos "strikethrough"
   mapM_ (applyNode buffer) children
@@ -108,6 +115,7 @@ mkTag name properties = do
     apply (Indent indent)      = flip setTextTagIndent indent
     apply (Strike strike)      = flip setTextTagStrikethrough strike
     apply (Justification j11n) = flip setTextTagJustification j11n
+    apply (Underline ul)       = flip setTextTagUnderline ul
 
 -- | Create a heading tag of a given level.
 mkHeadingTag :: TagProperties -> Level -> IO TextTag

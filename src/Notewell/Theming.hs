@@ -27,6 +27,7 @@ data TagProperty = Color Text
                  | Indent Int32
                  | Strike Bool
                  | Justification Justification
+                 | Underline Underline
   deriving (Generic, Eq)
 
 type TagProperties = [TagProperty]
@@ -50,13 +51,31 @@ instance FromJSON TagProperty where
     (Weight        <$> v .: "weight")        <|>
     (Indent        <$> v .: "indent")        <|>
     (Strike        <$> v .: "strikethrough") <|>
-    (Justification <$> v .: "justification")
+    (Justification <$> v .: "justification") <|>
+    (Underline     <$> v .: "underline")
 
 instance ToJSON TagProperty
 
 instance ToJSON Theme
 instance FromJSON Theme
 
+instance FromJSON Underline where
+  parseJSON (String t) = return $ case t of
+    "none"   -> UnderlineNone
+    "single" -> UnderlineSingle
+    "double" -> UnderlineDouble
+    "low"    -> UnderlineLow
+    "wavy"   -> UnderlineError
+    _        -> UnderlineNone
+
+instance ToJSON Underline where
+  toJSON UnderlineNone   = "none"
+  toJSON UnderlineSingle = "single"
+  toJSON UnderlineDouble = "double"
+  toJSON UnderlineLow    = "low"
+  toJSON UnderlineError  = "wavy"
+  toJSON _               = "none"
+  
 instance FromJSON Justification where
   parseJSON (String t) = return $ case t of
     "left"   -> JustificationLeft
