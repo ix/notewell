@@ -7,7 +7,6 @@
 -}
 module Notewell.Events where
 
-import           GI.Gtk                         ( TextBuffer )
 import           Notewell.Metrics               ( Metrics )
 
 data ThemeType = Light | Dark

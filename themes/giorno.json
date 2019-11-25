@@ -1,54 +1,55 @@
 { 
-  "background": "#f8f8f8",
-  "foreground": "#252526",
-  "toolbarColor": "#eee",
-  "borderColor": "#ccc",
-  "accent": "#eb2f7d",
-  "bodyFont": "Lato",
-  "isDark": false,
-  "elements": {
-    "heading": [
-	{"weight": "heavy"}
-    ],
-    "emph": [
-	{"style": "italic"}
-    ],
-    "strong": [
-	{"weight": "heavy"}
-    ],
-    "code": [
-	{"font": "Consolas"},
-	{"color": "#4f4f5f"}
-    ],
-    "codeBlock": [
-	{"font": "Consolas"},
-	{"color": "#4f4f5f"}
-    ],
-    "strikethrough": [
-	{"strikethrough": true}
-    ],
-    "thematicBreak": [
-	{"color": "#eb2f7d"},
-	{"scale": 2.0},
-	{"justification": "center"}
-    ],
-    "list": [
-	{"indent": 15},
-	{"color": "#4f4f5f"}
-    ],
-    "blockquote": [
-	{"style": "italic"},
-	{"indent": 30},
-	{"color": "#4f4f5f"},
-	{"font": "Cambria"},
-	{"weight": "bold"}
-    ],
-    "linkUrl": [
-	{"style": "italic"},
-	{"color": "#4f4f5f"}
-    ],
-    "linkText": [
-	{"weight": "bold"}
-    ]
-  }
+    "background": "#f8f8f8",
+    "foreground": "#252526",
+    "toolbarColor": "#eee",
+    "borderColor": "#ccc",
+    "accent": "#eb2f7d",
+    "bodyFont": "Lato",
+    "isDark": false,
+    "elements": {
+	"heading": [
+	    {"weight": "heavy"}
+	],
+	"emph": [
+	    {"style": "italic"}
+	],
+	"strong": [
+	    {"weight": "heavy"}
+	],
+	"code": [
+	    {"font": "Consolas"},
+	    {"color": "#4f4f5f"}
+	],
+	"codeBlock": [
+	    {"font": "Consolas"},
+	    {"color": "#4f4f5f"}
+	],
+	"strikethrough": [
+	    {"strikethrough": true}
+	],
+	"thematicBreak": [
+	    {"color": "#eb2f7d"},
+	    {"scale": 2.0},
+	    {"justification": "center"}
+	],
+	"list": [
+	    {"indent": 15},
+	    {"color": "#4f4f5f"}
+	],
+	"blockquote": [
+	    {"style": "italic"},
+	    {"indent": 30},
+	    {"color": "#4f4f5f"},
+	    {"font": "Cambria"},
+	    {"weight": "bold"}
+	],
+	"linkUrl": [
+	    {"underline": "single"},
+	    {"style": "italic"},
+	    {"color": "#4f4f5f"}
+	],
+	"linkText": [
+	    {"weight": "bold"}
+	]
+    }
 }

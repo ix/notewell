@@ -42,6 +42,14 @@
 	    {"color": "#afafbf"},
 	    {"font": "Cambria"},
 	    {"weight": "bold"}
+	],
+	"linkUrl": [
+	    {"underline": "single"},
+	    {"style": "italic"},
+	    {"color": "#eb2f7d"}
+	],
+	"linkText": [
+	    {"weight": "bold"}
 	]
     }
 }
