@@ -1,35 +1,35 @@
-{-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE OverloadedLabels    #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RecordWildCards #-}
 
 {-|
   Module : Notewell.Editor
   Description : A declarative Markdown editor widget.
-  Copyright : rose@empty.town 
+  Copyright : rose@empty.town
   License : BSD3
-  Maintainer : rose@empty.town 
+  Maintainer : rose@empty.town
 -}
 
 module Notewell.Editor where
 
-import           Notewell.Events                ( Event(..) )
-import           Notewell.Renderer              ( markdownTextTagTable )
-import           Notewell.Theming               ( Theme )
-import           Notewell.Metrics
-import           Notewell.Helpers               ( whenM )
-import qualified GI.Gtk.Declarative            as D
-import qualified GI.Gtk.Declarative.Widget     as D
-import qualified GI.Gtk.Declarative.State      as D
-import           GI.Gtk.Declarative.EventSource ( fromCancellation )
-import           Data.GI.Base.Overloading
-import           Data.Text                      ( Text )
-import           Control.Monad                  ( (<=<) )
-import           GI.Gtk
-import           GI.GObject
-import           CMarkGFM                       ( commonmarkToNode
-                                                , extStrikethrough
-                                                )
-import           Data.Vector                    ( Vector )
+
+import CMarkGFM                       (commonmarkToNode, extStrikethrough)
+import Control.Monad                  ((<=<))
+import Data.Text                      (Text)
+import Data.Vector                    (Vector)
+import GI.GObject                     (signalHandlerDisconnect)
+import GI.Gtk
+import GI.Gtk.Declarative.EventSource (fromCancellation)
+
+import qualified GI.Gtk.Declarative        as D
+import qualified GI.Gtk.Declarative.State  as D
+import qualified GI.Gtk.Declarative.Widget as D
+
+import Notewell.Events
+import Notewell.Helpers
+import Notewell.Metrics
+import Notewell.Renderer
+import Notewell.Theming
 
 data EditorParams = EditorParams { editorTheme  :: Theme        -- ^ The editor theme to use (used when creating the tag table).
                                  , editorBuffer :: TextBuffer } -- ^ The application-global buffer.

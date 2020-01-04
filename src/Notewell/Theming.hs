@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {- |
   Module : Notewell.Theming
@@ -10,14 +10,17 @@
 
 module Notewell.Theming where
 
-import           Data.Aeson
-import           Data.Text                      ( Text )
-import           Control.Applicative            ( (<|>) )
-import           GHC.Generics
-import           GI.Pango.Enums
-import           GI.Gtk.Enums
-import           Data.Int                       ( Int32 )
-import qualified Data.HashMap.Strict           as HM
+import Control.Applicative ((<|>))
+import Data.Aeson          (FromJSON, ToJSON, Value (..),
+                            eitherDecodeFileStrict, parseJSON, toJSON,
+                            withObject, (.:))
+import Data.Int            (Int32)
+import Data.Text           (Text)
+import GHC.Generics        (Generic)
+import GI.Gtk.Enums
+import GI.Pango.Enums
+
+import qualified Data.HashMap.Strict as HM
 
 data TagProperty = Color Text
                  | Font Text
@@ -32,14 +35,14 @@ data TagProperty = Color Text
 
 type TagProperties = [TagProperty]
 
-data Theme = Theme { background    :: Text
-                   , foreground    :: Text
-                   , toolbarColor  :: Text
-                   , borderColor   :: Text
-                   , accent        :: Text
-                   , bodyFont      :: Text
-                   , isDark        :: Bool
-                   , elements      :: !(HM.HashMap Text TagProperties) }
+data Theme = Theme { background   :: Text
+                   , foreground   :: Text
+                   , toolbarColor :: Text
+                   , borderColor  :: Text
+                   , accent       :: Text
+                   , bodyFont     :: Text
+                   , isDark       :: Bool
+                   , elements     :: !(HM.HashMap Text TagProperties) }
   deriving (Generic, Eq)
 
 instance FromJSON TagProperty where
@@ -75,7 +78,7 @@ instance ToJSON Underline where
   toJSON UnderlineLow    = "low"
   toJSON UnderlineError  = "wavy"
   toJSON _               = "none"
-  
+
 instance FromJSON Justification where
   parseJSON (String t) = return $ case t of
     "left"   -> JustificationLeft

@@ -1,0 +1,144 @@
+
+./app/Main.hs,994
+module Main Main15,16
+data Screen Screen45,46
+data Screen = Welcome Welcome45,46
+data Screen = Welcome | EditingEditing45,46
+data Properties Properties47,48
+data Properties = Properties Properties47,48
+data Properties = Properties { screen screen47,48
+                             , editorParams editorParams48,49
+                             , metrics metrics49,50
+newtype EditorEnv EditorEnv51,52
+newtype EditorEnv a = EditorEnv { unEditorEnv unEditorEnv51,52
+markdownFileFilter markdownFileFilter55,56
+editorHelper editorHelper64,65
+spawnFileDialog spawnFileDialog68,69
+renderMarkdown renderMarkdown80,81
+expandableChild expandableChild84,85
+toolbar toolbar88,89
+setIcon setIcon108,109
+getIconPath getIconPath116,117
+view' view'122,123
+update' update'152,153
+withSettings withSettings181,182
+setDefaultTheme setDefaultTheme185,186
+setTheme setTheme190,191
+main main201,202
+parseOpts parseOpts204,205
+startWithTheme startWithTheme214,215
+
+./Setup.hs,15
+main main1,2
+
+./src/GI/Gtk/Declarative/Container/FlowBox.hs,309
+module GI.Gtk.Declarative.Container.FlowBox GI.Gtk.Declarative.Container.FlowBox5,6
+instance IsContainer IsContainer Gtk-FlowBox (Bin Gtk-FlowBoxChild)13,14
+  appendChild appendChild14,15
+  replaceChild replaceChild16,17
+instance ToChildren ToChildren Gtk-FlowBox Vector (Bin Gtk-FlowBoxChild)20,21
+
+./src/Notewell/Editor.hs,356
+module Notewell.Editor Notewell.Editor12,13
+import import25,26
+data EditorParams EditorParams33,34
+data EditorParams = EditorParams EditorParams33,34
+data EditorParams = EditorParams { editorTheme editorTheme33,34
+                                 , editorBuffer editorBuffer34,35
+transmute transmute37,38
+markdownEditor markdownEditor41,42
+
+./src/Notewell/Events.hs,600
+module Notewell.Events Notewell.Events7,8
+data ThemeType ThemeType11,12
+data ThemeType = Light Light11,12
+data ThemeType = Light | DarkDark11,12
+data Event Event13,14
+data Event = Closed Closed13,14
+           | OpenFileSelected OpenFileSelected14,15
+           | NewClicked NewClicked15,16
+           | OpenClicked OpenClicked16,17
+           | SaveClicked SaveClicked17,18
+           | SaveFileSelected SaveFileSelected18,19
+           | UpdateMetrics UpdateMetrics19,20
+           | Render Render20,21
+           | ToggleTheme ToggleTheme21,22
+fromBool fromBool23,24
+
+./src/Notewell/Helpers.hs,65
+module Notewell.Helpers Notewell.Helpers8,9
+whenM whenM13,14
+
+./src/Notewell/Metrics.hs,199
+module Notewell.Metrics Notewell.Metrics10,11
+newtype Metrics Metrics16,17
+newtype Metrics = Metrics { counts counts16,17
+empty empty19,20
+formatCounts formatCounts23,24
+count count31,32
+
+./src/Notewell/Renderer.hs,339
+module Notewell.Renderer Notewell.Renderer12,13
+removeAllTags removeAllTags27,28
+applyAllTags applyAllTags34,35
+applyTag applyTag42,43
+adjustLinkPosInfo adjustLinkPosInfo55,56
+applyNode applyNode61,62
+markdownTextTagTable markdownTextTagTable92,93
+mkTag mkTag102,103
+mkHeadingTag mkHeadingTag120,121
+bytes bytes134,135
+
+./src/Notewell/Theming/CSS.hs,81
+module Notewell.Theming.CSS Notewell.Theming.CSS12,13
+buildCSS buildCSS20,21
+
+./src/Notewell/Theming.hs,1739
+module Notewell.Theming Notewell.Theming10,11
+data TagProperty TagProperty21,22
+data TagProperty = Color Color21,22
+                 | Font Font22,23
+                 | Scale Scale23,24
+                 | Style Style24,25
+                 | Weight Weight25,26
+                 | Indent Indent26,27
+                 | Strike Strike27,28
+                 | Justification Justification28,29
+                 | Underline Underline29,30
+type TagProperties TagProperties32,33
+data Theme Theme34,35
+data Theme = Theme Theme34,35
+data Theme = Theme { background background34,35
+                   , foreground foreground35,36
+                   , toolbarColor toolbarColor36,37
+                   , borderColor borderColor37,38
+                   , accent accent38,39
+                   , bodyFont bodyFont39,40
+                   , isDark isDark40,41
+                   , elements elements41,42
+instance FromJSON FromJSON TagProperty44,45
+  parseJSON parseJSON45,46
+instance ToJSON ToJSON TagProperty56,57
+instance ToJSON ToJSON Theme58,59
+instance FromJSON FromJSON Theme59,60
+instance FromJSON FromJSON Underline61,62
+  parseJSON parseJSON62,63
+instance ToJSON ToJSON Underline70,71
+  toJSON toJSON71,72
+instance FromJSON FromJSON Justification78,79
+  parseJSON parseJSON79,80
+instance ToJSON ToJSON Justification86,87
+  toJSON toJSON87,88
+instance FromJSON FromJSON Weight92,93
+  parseJSON parseJSON93,94
+instance ToJSON ToJSON Weight108,109
+  toJSON toJSON109,110
+instance FromJSON FromJSON Style122,123
+  parseJSON parseJSON123,124
+instance ToJSON ToJSON Style128,129
+  toJSON toJSON129,130
+readTheme readTheme134,135
+defaultTheme defaultTheme137,138
+
+./test/Spec.hs,15
+main main0,1

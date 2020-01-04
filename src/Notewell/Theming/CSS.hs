@@ -12,11 +12,12 @@
 
 module Notewell.Theming.CSS where
 
-import           Notewell.Theming
-import           Prelude                 hiding ( (++) )
-import           Data.Text.Encoding
-import           Data.ByteString.Char8
-import           Text.Shakespeare.Text
+import Data.ByteString.Char8
+import Data.Text.Encoding
+import Notewell.Theming
+import Text.Shakespeare.Text
+
+import Prelude hiding ((++))
 
 buildCSS :: Theme -> ByteString
 buildCSS Theme {..} = encodeUtf8 [st|
@@ -59,7 +60,7 @@ buildCSS Theme {..} = encodeUtf8 [st|
       background: @accent_color;
       color: @bg_color;
   }
-  .toolbar { 
+  .toolbar {
       background: #{toolbarColor};
       border-top: 1px solid #{borderColor};
   }

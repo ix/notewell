@@ -1,13 +1,13 @@
 {- |
  Module : Notewell.Events
- Description : The program's event type and its constructors. 
+ Description : The program's event type and its constructors.
  Copyright : Rose <rose@empty.town>
  License : BSD3
- Maintainer : rose@empty.town 
+ Maintainer : rose@empty.town
 -}
 module Notewell.Events where
 
-import           Notewell.Metrics               ( Metrics )
+import Notewell.Metrics (Metrics)
 
 data ThemeType = Light | Dark
 

@@ -15,42 +15,43 @@
 
 module Main where
 
-import           Control.Arrow
-import           Control.Concurrent.Async      (async)
-import           Control.Monad.Reader          (MonadReader, Reader, asks, runReader, void)
-import           Data.Either                   (fromRight)
-import           Data.GI.Base.Overloading      (IsDescendantOf)
-import           Data.Int                      (Int32)
-import           Data.Text                     (Text)
-import           GI.GLib.Functions             (idleAdd)
-import           GI.Gtk.Declarative
-import           GI.Gtk.Declarative.App.Simple
-import           System.Environment            (getArgs, getExecutablePath)
-import           System.FilePath.Posix         (takeDirectory, (<.>), (</>))
+import Control.Arrow
+import Control.Concurrent.Async      (async)
+import Control.Monad.Reader          (MonadReader, Reader, asks, runReader,
+                                      void)
+import Data.Either                   (fromRight)
+import Data.GI.Base.Overloading      (IsDescendantOf)
+import Data.Int                      (Int32)
+import Data.Text                     (Text)
+import GI.GLib.Functions             (idleAdd)
+import GI.Gtk.Declarative
+import GI.Gtk.Declarative.App.Simple
+import System.Environment            (getArgs, getExecutablePath)
+import System.FilePath.Posix         (takeDirectory, (<.>), (</>))
 
-import qualified Data.Text                     as T
-import qualified Data.Text.IO                  as T
-import qualified GI.Gdk                        as Gdk
-import qualified GI.GdkPixbuf                  as Gdk
-import qualified GI.GLib.Constants             as GLib
-import qualified GI.Gtk                        as Gtk
-import qualified Notewell.Metrics              as M
+import qualified Data.Text         as T
+import qualified Data.Text.IO      as T
+import qualified GI.Gdk            as Gdk
+import qualified GI.GdkPixbuf      as Gdk
+import qualified GI.GLib.Constants as GLib
+import qualified GI.Gtk            as Gtk
+import qualified Notewell.Metrics  as M
 
-import           Notewell.Editor
-import           Notewell.Events
-import           Notewell.Helpers
-import           Notewell.Renderer
-import           Notewell.Theming
-import           Notewell.Theming.CSS
+import Notewell.Editor
+import Notewell.Events
+import Notewell.Helpers
+import Notewell.Renderer
+import Notewell.Theming
+import Notewell.Theming.CSS
 
 data Screen = Welcome | Editing
 
-data Luggage = Luggage { screen       :: Screen
-                       , editorParams :: EditorParams
-                       , metrics      :: M.Metrics }
+data Properties = Properties { screen       :: Screen
+                             , editorParams :: EditorParams
+                             , metrics      :: M.Metrics }
 
-newtype AppState a = AppState { unAppState :: Reader Luggage a }
-  deriving (Functor, Applicative, Monad, MonadReader Luggage)
+newtype EditorEnv a = EditorEnv { unEditorEnv :: Reader Properties a }
+  deriving (Functor, Applicative, Monad, MonadReader Properties)
 
 -- | Constructs a FileFilter which pertains to Markdown documents.
 markdownFileFilter :: IO Gtk.FileFilter
@@ -86,7 +87,7 @@ expandableChild :: Widget a -> BoxChild a
 expandableChild = BoxChild defaultBoxChildProperties { expand = True, fill = True }
 
 -- | Simply a shorthand for the toolbar component.
-toolbar :: AppState (BoxChild Event)
+toolbar :: EditorEnv (BoxChild Event)
 toolbar = do
   textBuffer <- asks (editorBuffer . editorParams)
   metrics'   <- asks metrics
@@ -114,13 +115,13 @@ setIcon size fp tb = do
   Gtk.toolButtonSetIconWidget tb $ Just image
 
 -- | Get the path to an icon, taking into account the theme.
-getIconPath :: FilePath -> AppState FilePath
+getIconPath :: FilePath -> EditorEnv FilePath
 getIconPath filename = do
   mode <- isDark <$> asks (editorTheme . editorParams)
   pure $ "themes" </> "icons" </> (if mode then "dark" else "light") </> filename
 
--- | Builds a declarative view from the AppState.
-view' :: AppState (AppView Gtk.Window Event)
+-- | Builds a declarative view from the EditorEnv.
+view' :: EditorEnv (AppView Gtk.Window Event)
 view' = do
   s                <- asks screen
   params           <- asks editorParams
@@ -150,7 +151,7 @@ view' = do
           [ expandableChild $ bin Gtk.ScrolledWindow [] $ editorHelper params, toolbar' ]
 
 -- | Perform state transitions.
-update' :: Luggage -> Event -> Transition Luggage Event
+update' :: Properties -> Event -> Transition Properties Event
 update' s NewClicked                     = Transition s { screen = Editing } $ pure Nothing
 update' s (SaveFileSelected (Just file)) = Transition s { screen = Editing } $ do
   contents <- let buffer = (editorBuffer . editorParams) s in Gtk.get buffer #text
@@ -220,10 +221,10 @@ startWithTheme theme = do
   globalBuffer <- Gtk.new Gtk.TextBuffer [#tagTable Gtk.:= textTagTable]
 
   let app = App
-        { view         = runReader $ unAppState view'
+        { view         = runReader $ unEditorEnv view'
         , update       = update'
         , inputs       = []
-        , initialState = Luggage Welcome (EditorParams { editorTheme = theme, editorBuffer = globalBuffer }) M.empty
+        , initialState = Properties Welcome (EditorParams { editorTheme = theme, editorBuffer = globalBuffer }) M.empty
         }
 
   withSettings $ \settings -> do

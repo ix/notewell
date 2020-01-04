@@ -2,7 +2,7 @@
 
 {- |
  Module : Notewell.Metrics
- Description : Analysis functions for GTK TextBuffer. 
+ Description : Analysis functions for GTK TextBuffer.
  Copyright : Rose <rose@empty.town> & Max
  License : BSD3
  Maintainer : rose@empty.town
@@ -11,7 +11,8 @@
 module Notewell.Metrics where
 
 import           GI.Gtk
-import qualified Data.Text                     as T
+
+import qualified Data.Text as T
 
 -- | Data gathered from analyzing a TextBuffer.
 newtype Metrics = Metrics { counts :: (Int, Int, Int) }

@@ -1,6 +1,6 @@
+{-# LANGUAGE MultiWayIf        #-}
+{-# LANGUAGE OverloadedLabels  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE OverloadedLabels #-}
 
 {- |
  Module : Notewell.Renderer
@@ -12,17 +12,19 @@
 
 module Notewell.Renderer where
 
-import           CMarkGFM
-import           Control.Monad
-import qualified Data.ByteString               as BS
+import CMarkGFM
+import Control.Monad
+import Data.Maybe       (catMaybes, fromMaybe)
+import Data.Text        (Text)
+import Notewell.Helpers
+import Notewell.Theming
+
+import qualified Data.ByteString     as BS
 import qualified Data.HashMap.Strict as HM
-import           Data.Maybe (catMaybes, fromMaybe)
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
-import qualified Data.Text.Encoding            as T
-import           GI.Gtk                        hiding (Style, Weight, Justification, Scale)
-import           Notewell.Helpers               ( whenM )
-import           Notewell.Theming
+import qualified Data.Text           as T
+import qualified Data.Text.Encoding  as T
+
+import GI.Gtk hiding (Justification, Scale, Style, Weight)
 
 -- | Clear a TextBuffer of all styling tags.
 removeAllTags :: TextBuffer -> IO ()
@@ -50,7 +52,7 @@ applyTag buffer (PosInfo sl' sc' el' ec') tag = do
   sc = fromIntegral $ pred sc'
   el = fromIntegral $ pred el'
   ec = fromIntegral ec'
-  
+
 -- | Adjust the PosInfo of the text & url components of a LINK node.
 -- This is used for providing nicer rendering.
 adjustLinkPosInfo :: (PosInfo, PosInfo) -> (PosInfo, PosInfo)
@@ -93,7 +95,7 @@ applyNode buffer (Node _ _        children) = mapM_ (applyNode buffer) children
 markdownTextTagTable :: Theme -> IO TextTagTable
 markdownTextTagTable theme = do
   table <- textTagTableNew
-  mapM_ (textTagTableAdd table <=< uncurry mkTag) $ HM.toList $ elements theme 
+  mapM_ (textTagTableAdd table <=< uncurry mkTag) $ HM.toList $ elements theme
   mapM_ ((textTagTableAdd table =<<) . mkHeadingTag heading) [1 .. 6]
   return table
  where
