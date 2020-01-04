@@ -1,57 +1,56 @@
-{-# LANGUAGE OverloadedLabels  #-}
-{-# LANGUAGE OverloadedLists   #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedLabels           #-}
+{-# LANGUAGE OverloadedLists            #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TupleSections              #-}
 
 {- |
  Module : Main
- Description : Main module. 
+ Description : Main module.
  Copyright : Rose <rose@empty.town>
  License : BSD3
- Maintainer : rose@empty.town 
+ Maintainer : rose@empty.town
 -}
 
 module Main where
 
-import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
-import qualified Data.Text.IO                  as T
-import           Control.Monad
-import           Control.Concurrent.Async       ( async )
-import qualified GI.GdkPixbuf                  as Gdk
-import qualified GI.Gdk                        as Gdk
-import qualified GI.Gtk                        as Gtk
-import           Data.GI.Base.Overloading       ( IsDescendantOf )
-import           GI.GLib.Functions              ( idleAdd )
-import qualified GI.GLib.Constants             as GLib
+import           Control.Arrow
+import           Control.Concurrent.Async      (async)
+import           Control.Monad.Reader          (MonadReader, Reader, asks, runReader, void)
+import           Data.Either                   (fromRight)
+import           Data.GI.Base.Overloading      (IsDescendantOf)
+import           Data.Int                      (Int32)
+import           Data.Text                     (Text)
+import           GI.GLib.Functions             (idleAdd)
 import           GI.Gtk.Declarative
 import           GI.Gtk.Declarative.App.Simple
+import           System.Environment            (getArgs, getExecutablePath)
+import           System.FilePath.Posix         (takeDirectory, (<.>), (</>))
+
+import qualified Data.Text                     as T
+import qualified Data.Text.IO                  as T
+import qualified GI.Gdk                        as Gdk
+import qualified GI.GdkPixbuf                  as Gdk
+import qualified GI.GLib.Constants             as GLib
+import qualified GI.Gtk                        as Gtk
+import qualified Notewell.Metrics              as M
+
+import           Notewell.Editor
+import           Notewell.Events
+import           Notewell.Helpers
 import           Notewell.Renderer
 import           Notewell.Theming
 import           Notewell.Theming.CSS
-import qualified Notewell.Metrics              as M
-import           Notewell.Editor
-import           Notewell.Events                ( Event(..)
-                                                , ThemeType(..)
-                                                , fromBool
-                                                )
-import           Notewell.Helpers               ( whenM )
-import           System.FilePath.Posix
-import           System.Environment             ( getExecutablePath
-                                                , getArgs
-                                                )
-import           Control.Arrow
-import           Control.Monad.Trans.State.Strict
-import           Data.Int                       ( Int32 )
-import           Data.Either                    ( fromRight )
 
 data Screen = Welcome | Editing
 
-data Luggage = Luggage { screen         :: Screen
-                       , editorParams   :: EditorParams
-                       , metrics        :: M.Metrics }
+data Luggage = Luggage { screen       :: Screen
+                       , editorParams :: EditorParams
+                       , metrics      :: M.Metrics }
 
-type AppState a = State Luggage a
+newtype AppState a = AppState { unAppState :: Reader Luggage a }
+  deriving (Functor, Applicative, Monad, MonadReader Luggage)
 
 -- | Constructs a FileFilter which pertains to Markdown documents.
 markdownFileFilter :: IO Gtk.FileFilter
@@ -60,7 +59,7 @@ markdownFileFilter = do
   Gtk.fileFilterSetName filt $ Just "Markdown"
   Gtk.fileFilterAddPattern filt "*.md"
   Gtk.fileFilterAddPattern filt "*.markdown"
-  return filt
+  pure filt
 
 -- | Creates a markdown editor widget with some default options.
 editorHelper :: EditorParams -> Widget Event
@@ -75,7 +74,7 @@ spawnFileDialog action invoker = do
   Gtk.nativeDialogSetTransientFor chooser =<< parentWindow
   Gtk.fileChooserAddFilter chooser =<< markdownFileFilter
   statusCode <- Gtk.nativeDialogRun chooser
-  if statusCode == accept then Gtk.fileChooserGetFilename chooser else return Nothing
+  if statusCode == accept then Gtk.fileChooserGetFilename chooser else pure Nothing
   where accept = fromIntegral $ fromEnum Gtk.ResponseTypeAccept
 
 -- | Render Markdown based on the content of a TextBuffer.
@@ -89,17 +88,17 @@ expandableChild = BoxChild defaultBoxChildProperties { expand = True, fill = Tru
 -- | Simply a shorthand for the toolbar component.
 toolbar :: AppState (BoxChild Event)
 toolbar = do
-  textBuffer <- gets (editorBuffer . editorParams)
-  metrics'   <- gets metrics
-  themeState <- isDark <$> gets (editorTheme . editorParams)
-  return $ container
+  textBuffer <- asks (editorBuffer . editorParams)
+  metrics'   <- asks metrics
+  themeState <- isDark <$> asks (editorTheme . editorParams)
+  pure $ container
     Gtk.Box
     [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
     [ widget
       Gtk.Button
       [ onM #clicked $ \button -> do
         filename <- spawnFileDialog Gtk.FileChooserActionSave button
-        return $ SaveFileSelected filename
+        pure $ SaveFileSelected filename
       , #label := "Save"
       ]
     , expandableChild $ widget Gtk.Label [#label := M.formatCounts metrics', #halign := Gtk.AlignEnd]
@@ -117,18 +116,18 @@ setIcon size fp tb = do
 -- | Get the path to an icon, taking into account the theme.
 getIconPath :: FilePath -> AppState FilePath
 getIconPath filename = do
-  mode <- isDark <$> gets (editorTheme . editorParams)
-  return $ "themes" </> "icons" </> (if mode then "dark" else "light") </> filename
+  mode <- isDark <$> asks (editorTheme . editorParams)
+  pure $ "themes" </> "icons" </> (if mode then "dark" else "light") </> filename
 
 -- | Builds a declarative view from the AppState.
 view' :: AppState (AppView Gtk.Window Event)
 view' = do
-  s                <- gets screen
-  params           <- gets editorParams
+  s                <- asks screen
+  params           <- asks editorParams
   iconNewFile      <- getIconPath "new-file.svg"
   iconFolderOpened <- getIconPath "folder-opened.svg"
   toolbar'         <- toolbar
-  return
+  pure
     $ bin Gtk.Window
           [#title := "Notewell", on #deleteEvent (const (True, Closed)), #widthRequest := 480, #heightRequest := 300]
     $ case s of
@@ -142,7 +141,7 @@ view' = do
             [ afterCreated $ setIcon 64 iconFolderOpened
             , onM #clicked $ \button -> do
                 filename <- spawnFileDialog Gtk.FileChooserActionOpen button
-                return $ OpenFileSelected filename
+                pure $ OpenFileSelected filename
             , classes ["intro"]
             ]
           ]
@@ -152,12 +151,12 @@ view' = do
 
 -- | Perform state transitions.
 update' :: Luggage -> Event -> Transition Luggage Event
-update' s NewClicked                     = Transition s { screen = Editing } $ return Nothing
+update' s NewClicked                     = Transition s { screen = Editing } $ pure Nothing
 update' s (SaveFileSelected (Just file)) = Transition s { screen = Editing } $ do
   contents <- let buffer = (editorBuffer . editorParams) s in Gtk.get buffer #text
   whenM contents $ \text -> T.writeFile file text
-  return $ Just Render
-update' s (SaveFileSelected Nothing    ) = Transition s { screen = Editing } $ return Nothing
+  pure $ Just Render
+update' s (SaveFileSelected Nothing    ) = Transition s { screen = Editing } $ pure Nothing
 update' s (OpenFileSelected (Just file)) = Transition s { screen = Editing } $ do
   let buffer = (editorBuffer . editorParams) s
 
@@ -165,18 +164,18 @@ update' s (OpenFileSelected (Just file)) = Transition s { screen = Editing } $ d
   void $ idleAdd GLib.PRIORITY_HIGH_IDLE $ do
     contents <- T.readFile file
     Gtk.set buffer [#text Gtk.:= contents]
-    return False
+    pure False
 
   newCounts <- M.count buffer
-  return $ Just $ UpdateMetrics $ M.Metrics { M.counts = newCounts }
-update' s (OpenFileSelected Nothing) = Transition s { screen = Editing } $ return Nothing
-update' s (UpdateMetrics    m      ) = Transition s { metrics = m } $ return $ Just Render
+  pure $ Just $ UpdateMetrics $ M.Metrics { M.counts = newCounts }
+update' s (OpenFileSelected Nothing) = Transition s { screen = Editing } $ pure Nothing
+update' s (UpdateMetrics    m      ) = Transition s { metrics = m } $ pure $ Just Render
 update' s Render                     = Transition s $ do
   void $ idleAdd GLib.PRIORITY_HIGH_IDLE $ do
     renderMarkdown $ (editorBuffer . editorParams) s
-    return False
-  return Nothing
-update' s (ToggleTheme t) = Transition s $ setDefaultTheme t >> return (Just Render)
+    pure False
+  pure Nothing
+update' s (ToggleTheme t) = Transition s $ setDefaultTheme t >> pure (Just Render)
 update' _ _               = Exit
 
 -- | Call a monadic action with GTK settings, only if available.
@@ -198,7 +197,7 @@ setTheme theme settings = do
       Gtk.cssProviderLoadFromData provider $ buildCSS theme
       Gtk.styleContextAddProviderForScreen screen provider (fromIntegral Gtk.STYLE_PROVIDER_PRIORITY_USER)
       Gtk.setSettingsGtkApplicationPreferDarkTheme settings $ isDark theme
-      return False
+      pure False
 
 main :: IO ()
 main = getArgs >>= parseOpts
@@ -221,7 +220,7 @@ startWithTheme theme = do
   globalBuffer <- Gtk.new Gtk.TextBuffer [#tagTable Gtk.:= textTagTable]
 
   let app = App
-        { view         = evalState view'
+        { view         = runReader $ unAppState view'
         , update       = update'
         , inputs       = []
         , initialState = Luggage Welcome (EditorParams { editorTheme = theme, editorBuffer = globalBuffer }) M.empty
