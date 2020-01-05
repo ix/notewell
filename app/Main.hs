@@ -17,8 +17,8 @@ module Main where
 
 import Control.Arrow
 import Control.Concurrent.Async      (async)
-import Control.Monad.Reader          (MonadReader, Reader, asks, runReader,
-                                      void)
+import Control.Monad                 (forM_)
+import Control.Monad.Reader          (MonadReader, Reader, asks, runReader, void)
 import Data.Either                   (fromRight)
 import Data.GI.Base.Overloading      (IsDescendantOf)
 import Data.Int                      (Int32)
@@ -89,9 +89,9 @@ expandableChild = BoxChild defaultBoxChildProperties { expand = True, fill = Tru
 -- | Simply a shorthand for the toolbar component.
 toolbar :: EditorEnv (BoxChild Event)
 toolbar = do
-  textBuffer <- asks (editorBuffer . editorParams)
-  metrics'   <- asks metrics
-  themeState <- isDark <$> asks (editorTheme . editorParams)
+  textBuffer   <- asks (editorBuffer . editorParams)
+  metrics'     <- asks metrics
+  currentTheme <- asks (editorTheme . editorParams)
   pure $ container
     Gtk.Box
     [#orientation := Gtk.OrientationHorizontal, classes ["toolbar"]]
@@ -103,8 +103,20 @@ toolbar = do
       , #label := "Save"
       ]
     , expandableChild $ widget Gtk.Label [#label := M.formatCounts metrics', #halign := Gtk.AlignEnd]
-    , widget Gtk.Switch [#state := themeState, on #stateSet $ (False,) . ToggleTheme . fromBool]
+    , widget Gtk.Switch [ #state := isDark currentTheme,
+                          onM #stateSet $ \state -> pure $ do
+                            table <- #getTagTable textBuffer
+                            newTheme <- getDefaultTheme $ fromBool state
+                            switchTagTable currentTheme newTheme table
+                            pure (False, ToggleTheme $ fromBool state)
+                        ]
     ]
+
+-- | Attempts to mutate a TextTagTable to one built from a Theme.
+switchTagTable :: Theme -> Theme -> Gtk.TextTagTable -> IO ()
+switchTagTable oldTheme newTheme table = do
+  clearTable table oldTheme
+  populateTable table newTheme
 
 -- | Used as a callback with afterCreated to set the icon of a ToolButton.
 setIcon :: Int32 -> FilePath -> Gtk.ToolButton -> IO ()
@@ -185,8 +197,8 @@ withSettings action = Gtk.settingsGetDefault >>= flip whenM action
 
 -- | Set the default light or dark theme according to a ThemeType.
 setDefaultTheme :: ThemeType -> IO ()
-setDefaultTheme Light = withSettings <$> setTheme =<< fromRight defaultTheme <$> readTheme ("themes" </> "giorno.json")
-setDefaultTheme Dark  = withSettings <$> setTheme =<< fromRight defaultTheme <$> readTheme ("themes" </> "notte.json")
+setDefaultTheme Light = withSettings <$> setTheme =<< getDefaultTheme Light
+setDefaultTheme Dark  = withSettings <$> setTheme =<< getDefaultTheme Dark
 
 -- | Set a Theme application-wide.
 setTheme :: Theme -> Gtk.Settings -> IO ()

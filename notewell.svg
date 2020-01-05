@@ -1,0 +1,1670 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1200" height="774" onload="init(evt)" viewBox="0 0 1200 774" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples. -->
+<!-- NOTES:  -->
+<defs >
+	<linearGradient id="background" y1="0" y2="1" x1="0" x2="0" >
+		<stop stop-color="#eeeeee" offset="5%" />
+		<stop stop-color="#eeeeb0" offset="95%" />
+	</linearGradient>
+</defs>
+<style type="text/css">
+	.func_g:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	var details, searchbtn, matchedtxt, svg;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+	}
+
+	// mouse-over for info
+	function s(node) {		// show
+		info = g_to_text(node);
+		details.nodeValue = "Function: " + info;
+	}
+	function c() {			// clear
+		details.nodeValue = ' ';
+	}
+
+	// ctrl-F for search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+	})
+
+	// functions
+	function find_child(parent, name, attr) {
+		var children = parent.childNodes;
+		for (var i=0; i<children.length;i++) {
+			if (children[i].tagName == name)
+				return (attr != undefined) ? children[i].attributes[attr].value : children[i];
+		}
+		return;
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_"+attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_"+attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_"+attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		// if there's any manipulation we want to do to the function
+		// name before it's searched, do it here before returning.
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes["width"].value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes["x"].value = parseFloat(r.attributes["x"].value) +3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2*12*0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		// Fit in full text width
+		if (/^ *$/.test(txt) || t.getSubStringLength(0, txt.length) < w)
+			return;
+
+		for (var x=txt.length-2; x>0; x--) {
+			if (t.getSubStringLength(0, x+2) <= w) {
+				t.textContent = txt.substring(0,x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = (parseFloat(e.attributes["x"].value) - x - 10) * ratio + 10;
+				if(e.tagName == "text") e.attributes["x"].value = find_child(e.parentNode, "rect", "x") + 3;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseFloat(e.attributes["width"].value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_child(c[i], x-10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = 10;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseInt(svg.width.baseVal.value) - (10*2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr["width"].value);
+		var xmin = parseFloat(attr["x"].value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr["y"].value);
+		var ratio = (svg.width.baseVal.value - 2*10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "1.0";
+
+		var el = document.getElementsByTagName("g");
+		for(var i=0;i<el.length;i++){
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a["x"].value);
+			var ew = parseFloat(a["width"].value);
+			// Is it an ancestor
+			if (0 == 0) {
+				var upstack = parseFloat(a["y"].value) > ymin;
+			} else {
+				var upstack = parseFloat(a["y"].value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.style["opacity"] = "0.5";
+					zoom_parent(e);
+					e.onclick = function(e){unzoom(); zoom(this);};
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.style["display"] = "none";
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.style["display"] = "none";
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					e.onclick = function(e){zoom(this);};
+					update_text(e);
+				}
+			}
+		}
+	}
+	function unzoom() {
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "0.0";
+
+		var el = document.getElementsByTagName("g");
+		for(i=0;i<el.length;i++) {
+			el[i].style["display"] = "block";
+			el[i].style["opacity"] = "1";
+			zoom_reset(el[i]);
+			update_text(el[i]);
+		}
+	}
+
+	// search
+	function reset_search() {
+		var el = document.getElementsByTagName("rect");
+		for (var i=0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)", "");
+			if (term != null) {
+				search(term)
+			}
+		} else {
+			reset_search();
+			searching = 0;
+			searchbtn.style["opacity"] = "0.1";
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.style["opacity"] = "0.0";
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		var re = new RegExp(term);
+		var el = document.getElementsByTagName("g");
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			if (e.attributes["class"].value != "func_g")
+				continue;
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (rect == null) {
+				// the rect might be wrapped in an anchor
+				// if nameattr href is being used
+				if (rect = find_child(e, "a")) {
+				    rect = find_child(r, "rect");
+				}
+			}
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes["width"].value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes["x"].value);
+				orig_save(rect, "fill");
+				rect.attributes["fill"].value =
+				    "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+
+		searchbtn.style["opacity"] = "1.0";
+		searchbtn.firstChild.nodeValue = "Reset Search"
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+			return a - b;
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		var fudge = 0.0001;	// JavaScript floating point
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw - fudge) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.style["opacity"] = "1.0";
+		pct = 100 * count / maxwidth;
+		if (pct == 100)
+			pct = "100"
+		else
+			pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+	function searchover(e) {
+		searchbtn.style["opacity"] = "1.0";
+	}
+	function searchout(e) {
+		if (searching) {
+			searchbtn.style["opacity"] = "1.0";
+		} else {
+			searchbtn.style["opacity"] = "0.1";
+		}
+	}
+]]>
+</script>
+<rect x="0.0" y="0" width="1200.0" height="774.0" fill="url(#background)"  />
+<text text-anchor="middle" x="600.00" y="24" font-size="17" font-family="Verdana" fill="rgb(0,0,0)"  >Flame Graph</text>
+<text text-anchor="" x="10.00" y="757" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="details" > </text>
+<text text-anchor="" x="10.00" y="24" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="unzoom" onclick="unzoom()" style="opacity:0.0;cursor:pointer" >Reset Zoom</text>
+<text text-anchor="" x="1090.00" y="24" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="search" onmouseover="searchover()" onmouseout="searchout()" onclick="search_prompt()" style="opacity:0.1;cursor:pointer" >Search</text>
+<text text-anchor="" x="1090.00" y="757" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="matched" > </text>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.Switch.wrap_SwitchStateSetCallback (3 samples, 0.30%)</title><rect x="203.5" y="293" width="3.6" height="15.0" fill="rgb(250,5,20)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.Button.connectSignal (1 samples, 0.10%)</title><rect x="198.8" y="325" width="1.2" height="15.0" fill="rgb(240,209,45)" rx="2" ry="2" />
+<text text-anchor="" x="201.80" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Attoparsec.Internal.Types.&gt;&gt;=.\.succ' (1 samples, 0.10%)</title><rect x="1062.6" y="405" width="1.1" height="15.0" fill="rgb(246,13,54)" rx="2" ry="2" />
+<text text-anchor="" x="1065.56" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Fusion.Util.&gt;&gt;= (83 samples, 8.30%)</title><rect x="164.6" y="437" width="97.9" height="15.0" fill="rgb(246,79,13)" rx="2" ry="2" />
+<text text-anchor="" x="167.58" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Data.Vector..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.GObject.Functions.signalHandlerDisconnect (1 samples, 0.10%)</title><rect x="263.7" y="373" width="1.2" height="15.0" fill="rgb(212,60,6)" rx="2" ry="2" />
+<text text-anchor="" x="266.70" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newObject (2 samples, 0.20%)</title><rect x="60.7" y="389" width="2.4" height="15.0" fill="rgb(210,15,46)" rx="2" ry="2" />
+<text text-anchor="" x="63.74" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Fusion.Util.&gt;&gt;= (1 samples, 0.10%)</title><rect x="130.4" y="405" width="1.1" height="15.0" fill="rgb(211,115,30)" rx="2" ry="2" />
+<text text-anchor="" x="133.36" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.\ (1 samples, 0.10%)</title><rect x="157.5" y="453" width="1.2" height="15.0" fill="rgb(243,67,30)" rx="2" ry="2" />
+<text text-anchor="" x="160.50" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeManagedPtrCastPtr (5 samples, 0.50%)</title><rect x="563.4" y="341" width="5.9" height="15.0" fill="rgb(239,12,35)" rx="2" ry="2" />
+<text text-anchor="" x="566.42" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.BasicConversions.textToCString (19 samples, 1.90%)</title><rect x="533.9" y="357" width="22.4" height="15.0" fill="rgb(232,206,51)" rx="2" ry="2" />
+<text text-anchor="" x="536.92" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >D..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Strict.Base.insert (2 samples, 0.20%)</title><rect x="79.6" y="373" width="2.4" height="15.0" fill="rgb(233,89,13)" rx="2" ry="2" />
+<text text-anchor="" x="82.62" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.updateProperties.toAdd (1 samples, 0.10%)</title><rect x="51.3" y="453" width="1.2" height="15.0" fill="rgb(217,145,0)" rx="2" ry="2" />
+<text text-anchor="" x="54.30" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.collectAttributes (3 samples, 0.30%)</title><rect x="52.5" y="453" width="3.5" height="15.0" fill="rgb(212,95,19)" rx="2" ry="2" />
+<text text-anchor="" x="55.48" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Fusion.Util.&gt;&gt;= (52 samples, 5.20%)</title><rect x="65.5" y="421" width="61.3" height="15.0" fill="rgb(213,173,39)" rx="2" ry="2" />
+<text text-anchor="" x="68.46" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Data.V..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo (4 samples, 0.40%)</title><rect x="139.8" y="389" width="4.7" height="15.0" fill="rgb(210,192,34)" rx="2" ry="2" />
+<text text-anchor="" x="142.80" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Renderer.applyTag.el (1 samples, 0.10%)</title><rect x="1053.1" y="389" width="1.2" height="15.0" fill="rgb(253,154,29)" rx="2" ry="2" />
+<text text-anchor="" x="1056.12" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.insert (1 samples, 0.10%)</title><rect x="120.9" y="277" width="1.2" height="15.0" fill="rgb(220,0,19)" rx="2" ry="2" />
+<text text-anchor="" x="123.92" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Control.Monad.Primitive.primitive (1 samples, 0.10%)</title><rect x="255.4" y="389" width="1.2" height="15.0" fill="rgb(239,131,2)" rx="2" ry="2" />
+<text text-anchor="" x="258.44" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.Conversions.toGtkCallback (3 samples, 0.30%)</title><rect x="203.5" y="277" width="3.6" height="15.0" fill="rgb(253,21,41)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Mutable.basicUnsafeNew (2 samples, 0.20%)</title><rect x="254.3" y="405" width="2.3" height="15.0" fill="rgb(248,159,0)" rx="2" ry="2" />
+<text text-anchor="" x="257.26" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler (1 samples, 0.10%)</title><rect x="182.3" y="421" width="1.2" height="15.0" fill="rgb(211,68,4)" rx="2" ry="2" />
+<text text-anchor="" x="185.28" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeManagedPtrCastPtr.ptr (2 samples, 0.20%)</title><rect x="700.3" y="341" width="2.4" height="15.0" fill="rgb(254,126,5)" rx="2" ry="2" />
+<text text-anchor="" x="703.30" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.withManagedPtr (1 samples, 0.10%)</title><rect x="202.3" y="261" width="1.2" height="15.0" fill="rgb(223,113,48)" rx="2" ry="2" />
+<text text-anchor="" x="205.34" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.SingleWidget.subscribe (19 samples, 1.90%)</title><rect x="184.6" y="405" width="22.5" height="15.0" fill="rgb(208,69,19)" rx="2" ry="2" />
+<text text-anchor="" x="187.64" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >G..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Control.Concurrent.Async.asyncUsing.\.\ (885 samples, 88.50%)</title><rect x="19.4" y="597" width="1044.3" height="15.0" fill="rgb(206,92,26)" rx="2" ry="2" />
+<text text-anchor="" x="22.44" y="607.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Control.Concurrent.Async.asyncUsing.\.\</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Signals.connectSignalFunPtr (2 samples, 0.20%)</title><rect x="201.2" y="309" width="2.3" height="15.0" fill="rgb(218,56,1)" rx="2" ry="2" />
+<text text-anchor="" x="204.16" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.CustomWidget.customSubscribe (22 samples, 2.20%)</title><rect x="210.6" y="405" width="26.0" height="15.0" fill="rgb(241,98,17)" rx="2" ry="2" />
+<text text-anchor="" x="213.60" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >G..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (2 samples, 0.20%)</title><rect x="142.2" y="309" width="2.3" height="15.0" fill="rgb(236,81,33)" rx="2" ry="2" />
+<text text-anchor="" x="145.16" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Fusion.Util.&gt;&gt;= (1 samples, 0.10%)</title><rect x="263.7" y="469" width="1.2" height="15.0" fill="rgb(209,113,10)" rx="2" ry="2" />
+<text text-anchor="" x="266.70" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.updateProperties (5 samples, 0.50%)</title><rect x="118.6" y="357" width="5.9" height="15.0" fill="rgb(249,90,45)" rx="2" ry="2" />
+<text text-anchor="" x="121.56" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.basicUnsafeCopy (3 samples, 0.30%)</title><rect x="256.6" y="405" width="3.6" height="15.0" fill="rgb(230,97,33)" rx="2" ry="2" />
+<text text-anchor="" x="259.62" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.insert'.go (1 samples, 0.10%)</title><rect x="120.9" y="245" width="1.2" height="15.0" fill="rgb(253,192,21)" rx="2" ry="2" />
+<text text-anchor="" x="123.92" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Renderer.adjustLinkPosInfo (1 samples, 0.10%)</title><rect x="410.0" y="405" width="1.2" height="15.0" fill="rgb(217,48,7)" rx="2" ry="2" />
+<text text-anchor="" x="413.02" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Utils.callocBoxedBytes (54 samples, 5.40%)</title><rect x="988.2" y="357" width="63.7" height="15.0" fill="rgb(218,108,30)" rx="2" ry="2" />
+<text text-anchor="" x="991.22" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Data.GI..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.startWithTheme.app (22 samples, 2.20%)</title><rect x="210.6" y="389" width="26.0" height="15.0" fill="rgb(249,171,49)" rx="2" ry="2" />
+<text text-anchor="" x="213.60" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >M..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (3 samples, 0.30%)</title><rect x="103.2" y="293" width="3.6" height="15.0" fill="rgb(253,89,31)" rx="2" ry="2" />
+<text text-anchor="" x="106.22" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.insert'.go.ary' (1 samples, 0.10%)</title><rect x="47.8" y="341" width="1.1" height="15.0" fill="rgb(225,32,42)" rx="2" ry="2" />
+<text text-anchor="" x="50.76" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.SingleWidget.patch (7 samples, 0.70%)</title><rect x="116.2" y="373" width="8.3" height="15.0" fill="rgb(236,132,14)" rx="2" ry="2" />
+<text text-anchor="" x="119.20" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Control.Concurrent.Async.async (885 samples, 88.50%)</title><rect x="19.4" y="645" width="1044.3" height="15.0" fill="rgb(236,100,16)" rx="2" ry="2" />
+<text text-anchor="" x="22.44" y="655.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Control.Concurrent.Async.async</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.Widget.widgetQueueResize (2 samples, 0.20%)</title><rect x="124.5" y="373" width="2.3" height="15.0" fill="rgb(246,24,14)" rx="2" ry="2" />
+<text text-anchor="" x="127.46" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.withManagedPtr (2 samples, 0.20%)</title><rect x="162.2" y="421" width="2.4" height="15.0" fill="rgb(224,73,29)" rx="2" ry="2" />
+<text text-anchor="" x="165.22" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.view' (22 samples, 2.20%)</title><rect x="210.6" y="373" width="26.0" height="15.0" fill="rgb(229,189,32)" rx="2" ry="2" />
+<text text-anchor="" x="213.60" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >M..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.insert (2 samples, 0.20%)</title><rect x="79.6" y="357" width="2.4" height="15.0" fill="rgb(217,124,0)" rx="2" ry="2" />
+<text text-anchor="" x="82.62" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.ptrToNodeType (35 samples, 3.50%)</title><rect x="333.3" y="389" width="41.3" height="15.0" fill="rgb(244,4,41)" rx="2" ry="2" />
+<text text-anchor="" x="336.32" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >CMa..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.setDefaultTheme (2 samples, 0.20%)</title><rect x="1061.4" y="517" width="2.3" height="15.0" fill="rgb(228,129,33)" rx="2" ry="2" />
+<text text-anchor="" x="1064.38" y="527.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newObject (3 samples, 0.30%)</title><rect x="103.2" y="325" width="3.6" height="15.0" fill="rgb(251,42,3)" rx="2" ry="2" />
+<text text-anchor="" x="106.22" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.overloadedMethod (4 samples, 0.40%)</title><rect x="1056.7" y="453" width="4.7" height="15.0" fill="rgb(224,78,15)" rx="2" ry="2" />
+<text text-anchor="" x="1059.66" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.ptrToNodeType.title (9 samples, 0.90%)</title><rect x="355.7" y="373" width="10.7" height="15.0" fill="rgb(219,207,30)" rx="2" ry="2" />
+<text text-anchor="" x="358.74" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Container.Patch.patchInContainer.go.\ (37 samples, 3.70%)</title><rect x="83.2" y="389" width="43.6" height="15.0" fill="rgb(218,172,42)" rx="2" ry="2" />
+<text text-anchor="" x="86.16" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.G..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.insert' (1 samples, 0.10%)</title><rect x="47.8" y="373" width="1.1" height="15.0" fill="rgb(241,48,1)" rx="2" ry="2" />
+<text text-anchor="" x="50.76" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Strict.Base.intersectionWith.go (3 samples, 0.30%)</title><rect x="119.7" y="309" width="3.6" height="15.0" fill="rgb(219,50,26)" rx="2" ry="2" />
+<text text-anchor="" x="122.74" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler (1 samples, 0.10%)</title><rect x="263.7" y="421" width="1.2" height="15.0" fill="rgb(207,105,5)" rx="2" ry="2" />
+<text text-anchor="" x="266.70" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Renderer.applyTag.sl (2 samples, 0.20%)</title><rect x="1054.3" y="389" width="2.4" height="15.0" fill="rgb(250,26,34)" rx="2" ry="2" />
+<text text-anchor="" x="1057.30" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Metrics.formatCounts (2 samples, 0.20%)</title><rect x="1080.3" y="597" width="2.3" height="15.0" fill="rgb(254,25,18)" rx="2" ry="2" />
+<text text-anchor="" x="1083.26" y="607.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.withManagedPtr (4 samples, 0.40%)</title><rect x="139.8" y="373" width="4.7" height="15.0" fill="rgb(243,175,43)" rx="2" ry="2" />
+<text text-anchor="" x="142.80" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Attoparsec.Internal.Types.&gt;&gt;=.\.succ' (2 samples, 0.20%)</title><rect x="204.7" y="37" width="2.4" height="15.0" fill="rgb(236,154,12)" rx="2" ry="2" />
+<text text-anchor="" x="207.70" y="47.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (4 samples, 0.40%)</title><rect x="194.1" y="245" width="4.7" height="15.0" fill="rgb(238,33,22)" rx="2" ry="2" />
+<text text-anchor="" x="197.08" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr' (3 samples, 0.30%)</title><rect x="41.9" y="405" width="3.5" height="15.0" fill="rgb(215,99,16)" rx="2" ry="2" />
+<text text-anchor="" x="44.86" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeManagedPtrGetPtr (1 samples, 0.10%)</title><rect x="209.4" y="373" width="1.2" height="15.0" fill="rgb(235,190,29)" rx="2" ry="2" />
+<text text-anchor="" x="212.42" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo (5 samples, 0.50%)</title><rect x="192.9" y="325" width="5.9" height="15.0" fill="rgb(233,10,40)" rx="2" ry="2" />
+<text text-anchor="" x="195.90" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Container.Patch.padMaybes (4 samples, 0.40%)</title><rect x="110.3" y="373" width="4.7" height="15.0" fill="rgb(205,217,28)" rx="2" ry="2" />
+<text text-anchor="" x="113.30" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.GLib.Callbacks.wrap_SourceFunc (194 samples, 19.40%)</title><rect x="36.0" y="501" width="228.9" height="15.0" fill="rgb(211,62,41)" rx="2" ry="2" />
+<text text-anchor="" x="38.96" y="511.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.GLib.Callbacks.wrap_SourceF..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Editor.markdownEditor.customSubscribe (22 samples, 2.20%)</title><rect x="210.6" y="325" width="26.0" height="15.0" fill="rgb(212,55,46)" rx="2" ry="2" />
+<text text-anchor="" x="213.60" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >N..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo (4 samples, 0.40%)</title><rect x="58.4" y="437" width="4.7" height="15.0" fill="rgb(236,4,30)" rx="2" ry="2" />
+<text text-anchor="" x="61.38" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.BasicConversions.textToCString.\ (9 samples, 0.90%)</title><rect x="545.7" y="341" width="10.6" height="15.0" fill="rgb(234,11,43)" rx="2" ry="2" />
+<text text-anchor="" x="548.72" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.updateProperties.toMaybeSetOp (1 samples, 0.10%)</title><rect x="63.1" y="373" width="1.2" height="15.0" fill="rgb(254,194,32)" rx="2" ry="2" />
+<text text-anchor="" x="66.10" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.setupCancellation (5 samples, 0.50%)</title><rect x="138.6" y="421" width="5.9" height="15.0" fill="rgb(239,96,21)" rx="2" ry="2" />
+<text text-anchor="" x="141.62" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.updateProperties.setOps (4 samples, 0.40%)</title><rect x="118.6" y="341" width="4.7" height="15.0" fill="rgb(223,111,53)" rx="2" ry="2" />
+<text text-anchor="" x="121.56" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.toNode.handleNodes (11 samples, 1.10%)</title><rect x="374.6" y="389" width="13.0" height="15.0" fill="rgb(247,96,52)" rx="2" ry="2" />
+<text text-anchor="" x="377.62" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.\ (5 samples, 0.50%)</title><rect x="138.6" y="437" width="5.9" height="15.0" fill="rgb(254,98,10)" rx="2" ry="2" />
+<text text-anchor="" x="141.62" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Helpers.whenM (663 samples, 66.30%)</title><rect x="274.3" y="453" width="782.4" height="15.0" fill="rgb(210,84,18)" rx="2" ry="2" />
+<text text-anchor="" x="277.32" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Notewell.Helpers.whenM</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.basicUnsafeFreeze (2 samples, 0.20%)</title><rect x="260.2" y="405" width="2.3" height="15.0" fill="rgb(244,139,24)" rx="2" ry="2" />
+<text text-anchor="" x="263.16" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.basicUnsafeFreeze (1 samples, 0.10%)</title><rect x="1079.1" y="597" width="1.2" height="15.0" fill="rgb(219,81,2)" rx="2" ry="2" />
+<text text-anchor="" x="1082.08" y="607.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler (12 samples, 1.20%)</title><rect x="138.6" y="453" width="14.2" height="15.0" fill="rgb(223,140,52)" rx="2" ry="2" />
+<text text-anchor="" x="141.62" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.withManagedPtr (1 samples, 0.10%)</title><rect x="273.1" y="373" width="1.2" height="15.0" fill="rgb(222,97,45)" rx="2" ry="2" />
+<text text-anchor="" x="276.14" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.Widget.widgetQueueResize (1 samples, 0.10%)</title><rect x="131.5" y="421" width="1.2" height="15.0" fill="rgb(250,3,46)" rx="2" ry="2" />
+<text text-anchor="" x="134.54" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.ownedFinalizer (111 samples, 11.10%)</title><rect x="857.2" y="325" width="131.0" height="15.0" fill="rgb(227,35,1)" rx="2" ry="2" />
+<text text-anchor="" x="860.24" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Data.GI.Base.Man..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (1 samples, 0.10%)</title><rect x="1056.7" y="405" width="1.1" height="15.0" fill="rgb(252,217,18)" rx="2" ry="2" />
+<text text-anchor="" x="1059.66" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.textBufferGetEndIter (1 samples, 0.10%)</title><rect x="1056.7" y="437" width="1.1" height="15.0" fill="rgb(205,121,32)" rx="2" ry="2" />
+<text text-anchor="" x="1059.66" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Theming.readTheme (3 samples, 0.30%)</title><rect x="203.5" y="117" width="3.6" height="15.0" fill="rgb(249,162,15)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="127.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.wrapBoxed (1 samples, 0.10%)</title><rect x="220.0" y="277" width="1.2" height="15.0" fill="rgb(245,162,41)" rx="2" ry="2" />
+<text text-anchor="" x="223.04" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo.\ (2 samples, 0.20%)</title><rect x="162.2" y="405" width="2.4" height="15.0" fill="rgb(244,95,6)" rx="2" ry="2" />
+<text text-anchor="" x="165.22" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.wrapBoxed (242 samples, 24.20%)</title><rect x="702.7" y="357" width="285.5" height="15.0" fill="rgb(211,220,7)" rx="2" ry="2" />
+<text text-anchor="" x="705.66" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Data.GI.Base.ManagedPtr.wrapBoxed</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.getPosInfo (34 samples, 3.40%)</title><rect x="293.2" y="389" width="40.1" height="15.0" fill="rgb(236,202,5)" rx="2" ry="2" />
+<text text-anchor="" x="296.20" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >CMa..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.withManagedPtr (4 samples, 0.40%)</title><rect x="40.7" y="453" width="4.7" height="15.0" fill="rgb(243,41,43)" rx="2" ry="2" />
+<text text-anchor="" x="43.68" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.startWithTheme.app (16 samples, 1.60%)</title><rect x="1063.7" y="645" width="18.9" height="15.0" fill="rgb(223,175,21)" rx="2" ry="2" />
+<text text-anchor="" x="1066.74" y="655.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.BasicConversions.cstringToText (1 samples, 0.10%)</title><rect x="234.2" y="277" width="1.2" height="15.0" fill="rgb(218,208,47)" rx="2" ry="2" />
+<text text-anchor="" x="237.20" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Container.Patch.patchInContainer.go (38 samples, 3.80%)</title><rect x="82.0" y="405" width="44.8" height="15.0" fill="rgb(205,194,34)" rx="2" ry="2" />
+<text text-anchor="" x="84.98" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.G..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newObject (3 samples, 0.30%)</title><rect x="141.0" y="341" width="3.5" height="15.0" fill="rgb(225,217,23)" rx="2" ry="2" />
+<text text-anchor="" x="143.98" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.ownedFinalizer (1 samples, 0.10%)</title><rect x="220.0" y="245" width="1.2" height="15.0" fill="rgb(246,95,27)" rx="2" ry="2" />
+<text text-anchor="" x="223.04" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.textBufferGetStartIter (7 samples, 0.70%)</title><rect x="222.4" y="293" width="8.3" height="15.0" fill="rgb(222,121,29)" rx="2" ry="2" />
+<text text-anchor="" x="225.40" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Signals.connectSignalFunPtr (3 samples, 0.30%)</title><rect x="149.2" y="373" width="3.6" height="15.0" fill="rgb(218,95,10)" rx="2" ry="2" />
+<text text-anchor="" x="152.24" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newObject (1 samples, 0.10%)</title><rect x="208.2" y="357" width="1.2" height="15.0" fill="rgb(212,76,50)" rx="2" ry="2" />
+<text text-anchor="" x="211.24" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.Widget.toWidget (4 samples, 0.40%)</title><rect x="139.8" y="405" width="4.7" height="15.0" fill="rgb(250,206,44)" rx="2" ry="2" />
+<text text-anchor="" x="142.80" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo (2 samples, 0.20%)</title><rect x="208.2" y="405" width="2.4" height="15.0" fill="rgb(212,26,37)" rx="2" ry="2" />
+<text text-anchor="" x="211.24" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.lookup# (1 samples, 0.10%)</title><rect x="51.3" y="405" width="1.2" height="15.0" fill="rgb(217,125,38)" rx="2" ry="2" />
+<text text-anchor="" x="54.30" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Fusion.Util.&gt;&gt;= (1 samples, 0.10%)</title><rect x="1076.7" y="597" width="1.2" height="15.0" fill="rgb(238,109,16)" rx="2" ry="2" />
+<text text-anchor="" x="1079.72" y="607.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (1 samples, 0.10%)</title><rect x="1059.0" y="405" width="1.2" height="15.0" fill="rgb(213,137,44)" rx="2" ry="2" />
+<text text-anchor="" x="1062.02" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.ownedFinalizer (1 samples, 0.10%)</title><rect x="197.6" y="229" width="1.2" height="15.0" fill="rgb(246,23,34)" rx="2" ry="2" />
+<text text-anchor="" x="200.62" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.insert'.go (1 samples, 0.10%)</title><rect x="47.8" y="357" width="1.1" height="15.0" fill="rgb(214,118,32)" rx="2" ry="2" />
+<text text-anchor="" x="50.76" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeManagedPtrCastPtr (1 samples, 0.10%)</title><rect x="559.9" y="357" width="1.2" height="15.0" fill="rgb(210,224,42)" rx="2" ry="2" />
+<text text-anchor="" x="562.88" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Container.patch (64 samples, 6.40%)</title><rect x="57.2" y="453" width="75.5" height="15.0" fill="rgb(211,20,46)" rx="2" ry="2" />
+<text text-anchor="" x="60.20" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.D..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr.dbgCallStack (1 samples, 0.10%)</title><rect x="856.1" y="325" width="1.1" height="15.0" fill="rgb(232,218,41)" rx="2" ry="2" />
+<text text-anchor="" x="859.06" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.App.Simple.runLoop.loop (885 samples, 88.50%)</title><rect x="19.4" y="565" width="1044.3" height="15.0" fill="rgb(234,211,47)" rx="2" ry="2" />
+<text text-anchor="" x="22.44" y="575.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.Declarative.App.Simple.runLoop.loop</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Bin.patch (79 samples, 7.90%)</title><rect x="40.7" y="485" width="93.2" height="15.0" fill="rgb(242,53,5)" rx="2" ry="2" />
+<text text-anchor="" x="43.68" y="495.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.Decl..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Utils.callocBoxedBytes (1 samples, 0.10%)</title><rect x="229.5" y="277" width="1.2" height="15.0" fill="rgb(244,217,21)" rx="2" ry="2" />
+<text text-anchor="" x="232.48" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Renderer.applyAllTags.\ (663 samples, 66.30%)</title><rect x="274.3" y="437" width="782.4" height="15.0" fill="rgb(246,17,36)" rx="2" ry="2" />
+<text text-anchor="" x="277.32" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Notewell.Renderer.applyAllTags.\</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.textBufferGetText (5 samples, 0.50%)</title><rect x="230.7" y="293" width="5.9" height="15.0" fill="rgb(234,140,9)" rx="2" ry="2" />
+<text text-anchor="" x="233.66" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Bin.patch.newCollected (3 samples, 0.30%)</title><rect x="52.5" y="469" width="3.5" height="15.0" fill="rgb(229,55,23)" rx="2" ry="2" />
+<text text-anchor="" x="55.48" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Aeson.Parser.Internal.jsonEOF (3 samples, 0.30%)</title><rect x="203.5" y="101" width="3.6" height="15.0" fill="rgb(210,54,7)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="111.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.totext (7 samples, 0.70%)</title><rect x="347.5" y="357" width="8.2" height="15.0" fill="rgb(235,72,48)" rx="2" ry="2" />
+<text text-anchor="" x="350.48" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.wrapBoxed (2 samples, 0.20%)</title><rect x="270.8" y="357" width="2.3" height="15.0" fill="rgb(233,28,22)" rx="2" ry="2" />
+<text text-anchor="" x="273.78" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>all (1,000 samples, 100%)</title><rect x="10.0" y="725" width="1180.0" height="15.0" fill="rgb(242,32,14)" rx="2" ry="2" />
+<text text-anchor="" x="13.00" y="735.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.view' (16 samples, 1.60%)</title><rect x="1063.7" y="629" width="18.9" height="15.0" fill="rgb(250,76,50)" rx="2" ry="2" />
+<text text-anchor="" x="1066.74" y="639.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo.\ (5 samples, 0.50%)</title><rect x="192.9" y="293" width="5.9" height="15.0" fill="rgb(234,207,20)" rx="2" ry="2" />
+<text text-anchor="" x="195.90" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (1 samples, 0.10%)</title><rect x="220.0" y="261" width="1.2" height="15.0" fill="rgb(224,135,26)" rx="2" ry="2" />
+<text text-anchor="" x="223.04" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (1 samples, 0.10%)</title><rect x="208.2" y="325" width="1.2" height="15.0" fill="rgb(232,72,21)" rx="2" ry="2" />
+<text text-anchor="" x="211.24" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.insert (1 samples, 0.10%)</title><rect x="47.8" y="389" width="1.1" height="15.0" fill="rgb(221,202,38)" rx="2" ry="2" />
+<text text-anchor="" x="50.76" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Mutable.basicUnsafeNew (1 samples, 0.10%)</title><rect x="106.8" y="373" width="1.1" height="15.0" fill="rgb(239,103,54)" rx="2" ry="2" />
+<text text-anchor="" x="109.76" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.updateProperties.toMaybeSetOp (1 samples, 0.10%)</title><rect x="122.1" y="293" width="1.2" height="15.0" fill="rgb(254,49,35)" rx="2" ry="2" />
+<text text-anchor="" x="125.10" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>UNKNOWN (89 samples, 8.90%)</title><rect x="1085.0" y="709" width="105.0" height="15.0" fill="rgb(227,56,3)" rx="2" ry="2" />
+<text text-anchor="" x="1087.98" y="719.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >UNKNOWN</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Attoparsec.Internal.Types.&gt;&gt;=.\ (1 samples, 0.10%)</title><rect x="1062.6" y="421" width="1.1" height="15.0" fill="rgb(232,116,4)" rx="2" ry="2" />
+<text text-anchor="" x="1065.56" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (2 samples, 0.20%)</title><rect x="270.8" y="341" width="2.3" height="15.0" fill="rgb(224,212,7)" rx="2" ry="2" />
+<text text-anchor="" x="273.78" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.collectAttributes.go (2 samples, 0.20%)</title><rect x="53.7" y="421" width="2.3" height="15.0" fill="rgb(225,31,0)" rx="2" ry="2" />
+<text text-anchor="" x="56.66" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (216 samples, 21.60%)</title><rect x="733.3" y="341" width="254.9" height="15.0" fill="rgb(224,210,5)" rx="2" ry="2" />
+<text text-anchor="" x="736.34" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Data.GI.Base.ManagedPtr.newManaged..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Container.Patch.patchInContainer (58 samples, 5.80%)</title><rect x="64.3" y="437" width="68.4" height="15.0" fill="rgb(244,50,31)" rx="2" ry="2" />
+<text text-anchor="" x="67.28" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk...</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.touchManagedPtr (3 samples, 0.30%)</title><rect x="556.3" y="357" width="3.6" height="15.0" fill="rgb(215,27,26)" rx="2" ry="2" />
+<text text-anchor="" x="559.34" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.wrapBoxed (1 samples, 0.10%)</title><rect x="1059.0" y="421" width="1.2" height="15.0" fill="rgb(206,176,48)" rx="2" ry="2" />
+<text text-anchor="" x="1062.02" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.Widget.connectSignal (6 samples, 0.60%)</title><rect x="145.7" y="389" width="7.1" height="15.0" fill="rgb(217,35,29)" rx="2" ry="2" />
+<text text-anchor="" x="148.70" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Widget.patch (66 samples, 6.60%)</title><rect x="56.0" y="469" width="77.9" height="15.0" fill="rgb(240,62,10)" rx="2" ry="2" />
+<text text-anchor="" x="59.02" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.D..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.Conversions.toGtkCallback (3 samples, 0.30%)</title><rect x="203.5" y="261" width="3.6" height="15.0" fill="rgb(234,209,53)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler (1 samples, 0.10%)</title><rect x="157.5" y="469" width="1.2" height="15.0" fill="rgb(212,199,14)" rx="2" ry="2" />
+<text text-anchor="" x="160.50" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.EventSource.cancel (1 samples, 0.10%)</title><rect x="263.7" y="485" width="1.2" height="15.0" fill="rgb(206,190,30)" rx="2" ry="2" />
+<text text-anchor="" x="266.70" y="495.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.touchManagedPtr (3 samples, 0.30%)</title><rect x="690.9" y="357" width="3.5" height="15.0" fill="rgb(205,190,10)" rx="2" ry="2" />
+<text text-anchor="" x="693.86" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>MAIN.MAIN (911 samples, 91.10%)</title><rect x="10.0" y="709" width="1075.0" height="15.0" fill="rgb(222,87,9)" rx="2" ry="2" />
+<text text-anchor="" x="13.00" y="719.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >MAIN.MAIN</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.toNode (95 samples, 9.50%)</title><rect x="275.5" y="405" width="112.1" height="15.0" fill="rgb(216,209,43)" rx="2" ry="2" />
+<text text-anchor="" x="278.50" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >CMarkGFM.toNode</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (4 samples, 0.40%)</title><rect x="224.8" y="261" width="4.7" height="15.0" fill="rgb(238,94,45)" rx="2" ry="2" />
+<text text-anchor="" x="227.76" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.BasicConversions.textToCString.\ (1 samples, 0.10%)</title><rect x="151.6" y="325" width="1.2" height="15.0" fill="rgb(252,107,16)" rx="2" ry="2" />
+<text text-anchor="" x="154.60" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gdk.Functions.threadsAddIdle (204 samples, 20.40%)</title><rect x="24.2" y="517" width="240.7" height="15.0" fill="rgb(210,134,18)" rx="2" ry="2" />
+<text text-anchor="" x="27.16" y="527.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gdk.Functions.threadsAddIdle</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo.\ (3 samples, 0.30%)</title><rect x="59.6" y="405" width="3.5" height="15.0" fill="rgb(226,112,53)" rx="2" ry="2" />
+<text text-anchor="" x="62.56" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (1 samples, 0.10%)</title><rect x="163.4" y="357" width="1.2" height="15.0" fill="rgb(237,92,30)" rx="2" ry="2" />
+<text text-anchor="" x="166.40" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.toolbar (9 samples, 0.90%)</title><rect x="1072.0" y="613" width="10.6" height="15.0" fill="rgb(254,185,15)" rx="2" ry="2" />
+<text text-anchor="" x="1075.00" y="623.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.main (903 samples, 90.30%)</title><rect x="19.4" y="693" width="1065.6" height="15.0" fill="rgb(229,35,40)" rx="2" ry="2" />
+<text text-anchor="" x="22.44" y="703.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Main.main</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.listenToSignal (7 samples, 0.70%)</title><rect x="198.8" y="373" width="8.3" height="15.0" fill="rgb(242,218,13)" rx="2" ry="2" />
+<text text-anchor="" x="201.80" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr' (3 samples, 0.30%)</title><rect x="103.2" y="309" width="3.6" height="15.0" fill="rgb(245,49,36)" rx="2" ry="2" />
+<text text-anchor="" x="106.22" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.listenToSignal.\ (6 samples, 0.60%)</title><rect x="145.7" y="421" width="7.1" height="15.0" fill="rgb(240,98,24)" rx="2" ry="2" />
+<text text-anchor="" x="148.70" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.Switch.connectSignal.cb' (3 samples, 0.30%)</title><rect x="203.5" y="309" width="3.6" height="15.0" fill="rgb(243,71,31)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Container.subscribe (87 samples, 8.70%)</title><rect x="161.0" y="453" width="102.7" height="15.0" fill="rgb(247,156,27)" rx="2" ry="2" />
+<text text-anchor="" x="164.04" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.Decla..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Signals.connectSignalFunPtr.\ (1 samples, 0.10%)</title><rect x="202.3" y="277" width="1.2" height="15.0" fill="rgb(233,43,23)" rx="2" ry="2" />
+<text text-anchor="" x="205.34" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Fusion.Util.&gt;&gt;= (17 samples, 1.70%)</title><rect x="137.4" y="469" width="20.1" height="15.0" fill="rgb(243,194,17)" rx="2" ry="2" />
+<text text-anchor="" x="140.44" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.collectAttributes.go.\ (3 samples, 0.30%)</title><rect x="78.4" y="389" width="3.6" height="15.0" fill="rgb(229,110,31)" rx="2" ry="2" />
+<text text-anchor="" x="81.44" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.listenToSignal (7 samples, 0.70%)</title><rect x="144.5" y="437" width="8.3" height="15.0" fill="rgb(253,141,13)" rx="2" ry="2" />
+<text text-anchor="" x="147.52" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Fusion.Stream.Monadic.fmap (1 samples, 0.10%)</title><rect x="130.4" y="389" width="1.1" height="15.0" fill="rgb(241,43,54)" rx="2" ry="2" />
+<text text-anchor="" x="133.36" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo.\ (3 samples, 0.30%)</title><rect x="41.9" y="437" width="3.5" height="15.0" fill="rgb(219,56,54)" rx="2" ry="2" />
+<text text-anchor="" x="44.86" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.SingleWidget.patch (1 samples, 0.10%)</title><rect x="132.7" y="453" width="1.2" height="15.0" fill="rgb(249,209,18)" rx="2" ry="2" />
+<text text-anchor="" x="135.72" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Container.Patch.padMaybes (3 samples, 0.30%)</title><rect x="126.8" y="421" width="3.6" height="15.0" fill="rgb(209,0,36)" rx="2" ry="2" />
+<text text-anchor="" x="129.82" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.BasicConversions.textToCString (2 samples, 0.20%)</title><rect x="150.4" y="341" width="2.4" height="15.0" fill="rgb(217,38,40)" rx="2" ry="2" />
+<text text-anchor="" x="153.42" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newObject (3 samples, 0.30%)</title><rect x="41.9" y="421" width="3.5" height="15.0" fill="rgb(237,115,32)" rx="2" ry="2" />
+<text text-anchor="" x="44.86" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Container.subscribe.\ (20 samples, 2.00%)</title><rect x="183.5" y="421" width="23.6" height="15.0" fill="rgb(218,20,27)" rx="2" ry="2" />
+<text text-anchor="" x="186.46" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >G..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Aeson.Parser.Internal.jsonEOF (1 samples, 0.10%)</title><rect x="1062.6" y="469" width="1.1" height="15.0" fill="rgb(217,93,21)" rx="2" ry="2" />
+<text text-anchor="" x="1065.56" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.insert' (1 samples, 0.10%)</title><rect x="80.8" y="341" width="1.2" height="15.0" fill="rgb(214,74,37)" rx="2" ry="2" />
+<text text-anchor="" x="83.80" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Control.Monad.Primitive.primitive (1 samples, 0.10%)</title><rect x="107.9" y="357" width="1.2" height="15.0" fill="rgb(217,83,29)" rx="2" ry="2" />
+<text text-anchor="" x="110.94" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.collectAttributes.go.\ (1 samples, 0.10%)</title><rect x="54.8" y="405" width="1.2" height="15.0" fill="rgb(250,66,33)" rx="2" ry="2" />
+<text text-anchor="" x="57.84" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.setupCancellation (1 samples, 0.10%)</title><rect x="263.7" y="389" width="1.2" height="15.0" fill="rgb(248,76,48)" rx="2" ry="2" />
+<text text-anchor="" x="266.70" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.ownedFinalizer (1 samples, 0.10%)</title><rect x="179.9" y="325" width="1.2" height="15.0" fill="rgb(229,223,52)" rx="2" ry="2" />
+<text text-anchor="" x="182.92" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Attoparsec.Internal.Types.&gt;&gt;= (3 samples, 0.30%)</title><rect x="203.5" y="69" width="3.6" height="15.0" fill="rgb(226,210,31)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="79.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler (15 samples, 1.50%)</title><rect x="189.4" y="389" width="17.7" height="15.0" fill="rgb(223,110,30)" rx="2" ry="2" />
+<text text-anchor="" x="192.36" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.withManagedPtr (2 samples, 0.20%)</title><rect x="208.2" y="389" width="2.4" height="15.0" fill="rgb(253,182,38)" rx="2" ry="2" />
+<text text-anchor="" x="211.24" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.updateProperties.setOps (5 samples, 0.50%)</title><rect x="45.4" y="453" width="5.9" height="15.0" fill="rgb(252,201,25)" rx="2" ry="2" />
+<text text-anchor="" x="48.40" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (2 samples, 0.20%)</title><rect x="178.7" y="341" width="2.4" height="15.0" fill="rgb(245,216,36)" rx="2" ry="2" />
+<text text-anchor="" x="181.74" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.difference (1 samples, 0.10%)</title><rect x="51.3" y="437" width="1.2" height="15.0" fill="rgb(231,64,26)" rx="2" ry="2" />
+<text text-anchor="" x="54.30" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Mutable.basicUnsafeWrite (1 samples, 0.10%)</title><rect x="113.8" y="341" width="1.2" height="15.0" fill="rgb(234,115,53)" rx="2" ry="2" />
+<text text-anchor="" x="116.84" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr' (2 samples, 0.20%)</title><rect x="142.2" y="325" width="2.3" height="15.0" fill="rgb(225,6,24)" rx="2" ry="2" />
+<text text-anchor="" x="145.16" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.totext (6 samples, 0.60%)</title><rect x="359.3" y="357" width="7.1" height="15.0" fill="rgb(210,34,4)" rx="2" ry="2" />
+<text text-anchor="" x="362.28" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.updateProperties.toAdd (1 samples, 0.10%)</title><rect x="123.3" y="341" width="1.2" height="15.0" fill="rgb(242,65,30)" rx="2" ry="2" />
+<text text-anchor="" x="126.28" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Bin.patch.newCollected (1 samples, 0.10%)</title><rect x="109.1" y="373" width="1.2" height="15.0" fill="rgb(228,67,8)" rx="2" ry="2" />
+<text text-anchor="" x="112.12" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.App.Simple.runUI (204 samples, 20.40%)</title><rect x="24.2" y="549" width="240.7" height="15.0" fill="rgb(233,194,13)" rx="2" ry="2" />
+<text text-anchor="" x="27.16" y="559.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.Declarative.App.Simple.ru..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.toolbar (3 samples, 0.30%)</title><rect x="203.5" y="197" width="3.6" height="15.0" fill="rgb(207,173,14)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="207.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.basicUnsafeIndexM (1 samples, 0.10%)</title><rect x="181.1" y="421" width="1.2" height="15.0" fill="rgb(212,223,16)" rx="2" ry="2" />
+<text text-anchor="" x="184.10" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.\ (7 samples, 0.70%)</title><rect x="190.5" y="373" width="8.3" height="15.0" fill="rgb(221,184,17)" rx="2" ry="2" />
+<text text-anchor="" x="193.54" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (2 samples, 0.20%)</title><rect x="60.7" y="357" width="2.4" height="15.0" fill="rgb(249,224,32)" rx="2" ry="2" />
+<text text-anchor="" x="63.74" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Attoparsec.Internal.Types.&gt;&gt;= (1 samples, 0.10%)</title><rect x="1062.6" y="437" width="1.1" height="15.0" fill="rgb(219,126,12)" rx="2" ry="2" />
+<text text-anchor="" x="1065.56" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.listenToSignal.\ (7 samples, 0.70%)</title><rect x="198.8" y="357" width="8.3" height="15.0" fill="rgb(205,62,35)" rx="2" ry="2" />
+<text text-anchor="" x="201.80" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.startWithTheme (901 samples, 90.10%)</title><rect x="19.4" y="661" width="1063.2" height="15.0" fill="rgb(213,119,6)" rx="2" ry="2" />
+<text text-anchor="" x="22.44" y="671.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Main.startWithTheme</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Renderer.applyNode (567 samples, 56.70%)</title><rect x="387.6" y="421" width="669.1" height="15.0" fill="rgb(242,169,14)" rx="2" ry="2" />
+<text text-anchor="" x="390.60" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Notewell.Renderer.applyNode</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.textBufferGetCharCount (1 samples, 0.10%)</title><rect x="216.5" y="293" width="1.2" height="15.0" fill="rgb(218,123,32)" rx="2" ry="2" />
+<text text-anchor="" x="219.50" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Strict.Base.intersectionWith (4 samples, 0.40%)</title><rect x="118.6" y="325" width="4.7" height="15.0" fill="rgb(212,28,35)" rx="2" ry="2" />
+<text text-anchor="" x="121.56" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.textBufferApplyTagByName (119 samples, 11.90%)</title><rect x="428.9" y="373" width="140.4" height="15.0" fill="rgb(209,189,21)" rx="2" ry="2" />
+<text text-anchor="" x="431.90" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.Objects.Te..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Container.Patch.patchInContainer.indices (1 samples, 0.10%)</title><rect x="130.4" y="421" width="1.1" height="15.0" fill="rgb(235,179,34)" rx="2" ry="2" />
+<text text-anchor="" x="133.36" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.ownedFinalizer (2 samples, 0.20%)</title><rect x="227.1" y="245" width="2.4" height="15.0" fill="rgb(223,128,9)" rx="2" ry="2" />
+<text text-anchor="" x="230.12" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeManagedPtrCastPtr (7 samples, 0.70%)</title><rect x="694.4" y="357" width="8.3" height="15.0" fill="rgb(238,207,26)" rx="2" ry="2" />
+<text text-anchor="" x="697.40" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Container.Patch.patchInContainer.indices (1 samples, 0.10%)</title><rect x="115.0" y="373" width="1.2" height="15.0" fill="rgb(205,218,46)" rx="2" ry="2" />
+<text text-anchor="" x="118.02" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.parseOpts (903 samples, 90.30%)</title><rect x="19.4" y="677" width="1065.6" height="15.0" fill="rgb(213,146,20)" rx="2" ry="2" />
+<text text-anchor="" x="22.44" y="687.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Main.parseOpts</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Renderer.adjustLinkPosInfo.urlPos' (1 samples, 0.10%)</title><rect x="410.0" y="389" width="1.2" height="15.0" fill="rgb(234,53,12)" rx="2" ry="2" />
+<text text-anchor="" x="413.02" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.basicUnsafeIndexM (1 samples, 0.10%)</title><rect x="129.2" y="405" width="1.2" height="15.0" fill="rgb(244,80,14)" rx="2" ry="2" />
+<text text-anchor="" x="132.18" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (3 samples, 0.30%)</title><rect x="41.9" y="389" width="3.5" height="15.0" fill="rgb(210,193,4)" rx="2" ry="2" />
+<text text-anchor="" x="44.86" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newObject (2 samples, 0.20%)</title><rect x="178.7" y="373" width="2.4" height="15.0" fill="rgb(214,164,10)" rx="2" ry="2" />
+<text text-anchor="" x="181.74" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Control.Concurrent.Async.asyncUsing.\ (885 samples, 88.50%)</title><rect x="19.4" y="613" width="1044.3" height="15.0" fill="rgb(237,203,35)" rx="2" ry="2" />
+<text text-anchor="" x="22.44" y="623.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Control.Concurrent.Async.asyncUsing.\</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.ptrToNodeType.level (2 samples, 0.20%)</title><rect x="342.8" y="373" width="2.3" height="15.0" fill="rgb(213,181,3)" rx="2" ry="2" />
+<text text-anchor="" x="345.76" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.hash (1 samples, 0.10%)</title><rect x="79.6" y="341" width="1.2" height="15.0" fill="rgb(249,57,3)" rx="2" ry="2" />
+<text text-anchor="" x="82.62" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr' (1 samples, 0.10%)</title><rect x="163.4" y="373" width="1.2" height="15.0" fill="rgb(225,32,23)" rx="2" ry="2" />
+<text text-anchor="" x="166.40" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.textBufferGetEndIter (3 samples, 0.30%)</title><rect x="217.7" y="293" width="3.5" height="15.0" fill="rgb(242,170,16)" rx="2" ry="2" />
+<text text-anchor="" x="220.68" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.App.Simple.runLoop (885 samples, 88.50%)</title><rect x="19.4" y="581" width="1044.3" height="15.0" fill="rgb(206,207,46)" rx="2" ry="2" />
+<text text-anchor="" x="22.44" y="591.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.Declarative.App.Simple.runLoop</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr' (2 samples, 0.20%)</title><rect x="178.7" y="357" width="2.4" height="15.0" fill="rgb(250,83,36)" rx="2" ry="2" />
+<text text-anchor="" x="181.74" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.BasicConversions.withTextCString (3 samples, 0.30%)</title><rect x="149.2" y="357" width="3.6" height="15.0" fill="rgb(209,199,36)" rx="2" ry="2" />
+<text text-anchor="" x="152.24" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.ptrToNodeType.literal (9 samples, 0.90%)</title><rect x="345.1" y="373" width="10.6" height="15.0" fill="rgb(242,37,40)" rx="2" ry="2" />
+<text text-anchor="" x="348.12" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.Widget.toWidget (5 samples, 0.50%)</title><rect x="192.9" y="341" width="5.9" height="15.0" fill="rgb(227,202,24)" rx="2" ry="2" />
+<text text-anchor="" x="195.90" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Container.subscribe.\ (1 samples, 0.10%)</title><rect x="263.7" y="453" width="1.2" height="15.0" fill="rgb(254,27,4)" rx="2" ry="2" />
+<text text-anchor="" x="266.70" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.lookup# (1 samples, 0.10%)</title><rect x="119.7" y="293" width="1.2" height="15.0" fill="rgb(254,86,16)" rx="2" ry="2" />
+<text text-anchor="" x="122.74" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeManagedPtrGetPtr (7 samples, 0.70%)</title><rect x="561.1" y="357" width="8.2" height="15.0" fill="rgb(238,188,30)" rx="2" ry="2" />
+<text text-anchor="" x="564.06" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.insert'.go (1 samples, 0.10%)</title><rect x="80.8" y="325" width="1.2" height="15.0" fill="rgb(212,203,32)" rx="2" ry="2" />
+<text text-anchor="" x="83.80" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo.\ (4 samples, 0.40%)</title><rect x="102.0" y="341" width="4.8" height="15.0" fill="rgb(246,209,7)" rx="2" ry="2" />
+<text text-anchor="" x="105.04" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.EventSource.&lt;&gt; (22 samples, 2.20%)</title><rect x="236.6" y="421" width="25.9" height="15.0" fill="rgb(208,37,47)" rx="2" ry="2" />
+<text text-anchor="" x="239.56" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >G..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.wrapBoxed (4 samples, 0.40%)</title><rect x="224.8" y="277" width="4.7" height="15.0" fill="rgb(250,178,42)" rx="2" ry="2" />
+<text text-anchor="" x="227.76" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.getTextBufferText (3 samples, 0.30%)</title><rect x="270.8" y="421" width="3.5" height="15.0" fill="rgb(226,164,44)" rx="2" ry="2" />
+<text text-anchor="" x="273.78" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Renderer.removeAllTags (4 samples, 0.40%)</title><rect x="1056.7" y="469" width="4.7" height="15.0" fill="rgb(240,111,33)" rx="2" ry="2" />
+<text text-anchor="" x="1059.66" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.updateProperties (1 samples, 0.10%)</title><rect x="63.1" y="437" width="1.2" height="15.0" fill="rgb(235,98,28)" rx="2" ry="2" />
+<text text-anchor="" x="66.10" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Strict.Base.insert (1 samples, 0.10%)</title><rect x="47.8" y="405" width="1.1" height="15.0" fill="rgb(212,189,2)" rx="2" ry="2" />
+<text text-anchor="" x="50.76" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.BasicConversions.textToCString.\ (1 samples, 0.10%)</title><rect x="201.2" y="261" width="1.1" height="15.0" fill="rgb(239,201,34)" rx="2" ry="2" />
+<text text-anchor="" x="204.16" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.textBufferGetText.includeHiddenChars' (1 samples, 0.10%)</title><rect x="235.4" y="277" width="1.2" height="15.0" fill="rgb(220,64,21)" rx="2" ry="2" />
+<text text-anchor="" x="238.38" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.Switch.connectSignal (6 samples, 0.60%)</title><rect x="200.0" y="325" width="7.1" height="15.0" fill="rgb(236,157,19)" rx="2" ry="2" />
+<text text-anchor="" x="202.98" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newObject (1 samples, 0.10%)</title><rect x="136.3" y="421" width="1.1" height="15.0" fill="rgb(250,34,12)" rx="2" ry="2" />
+<text text-anchor="" x="139.26" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.attrGet (3 samples, 0.30%)</title><rect x="270.8" y="437" width="3.5" height="15.0" fill="rgb(207,85,25)" rx="2" ry="2" />
+<text text-anchor="" x="273.78" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.basicUnsafeIndexM (1 samples, 0.10%)</title><rect x="188.2" y="389" width="1.2" height="15.0" fill="rgb(212,152,5)" rx="2" ry="2" />
+<text text-anchor="" x="191.18" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.insert' (1 samples, 0.10%)</title><rect x="120.9" y="261" width="1.2" height="15.0" fill="rgb(238,113,1)" rx="2" ry="2" />
+<text text-anchor="" x="123.92" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.basicUnsafeFreeze (1 samples, 0.10%)</title><rect x="156.3" y="437" width="1.2" height="15.0" fill="rgb(206,78,7)" rx="2" ry="2" />
+<text text-anchor="" x="159.32" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Theming.readTheme (2 samples, 0.20%)</title><rect x="1061.4" y="485" width="2.3" height="15.0" fill="rgb(207,187,12)" rx="2" ry="2" />
+<text text-anchor="" x="1064.38" y="495.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Mutable.basicUnsafeNew (1 samples, 0.10%)</title><rect x="154.0" y="437" width="1.1" height="15.0" fill="rgb(240,126,45)" rx="2" ry="2" />
+<text text-anchor="" x="156.96" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr (1 samples, 0.10%)</title><rect x="136.3" y="389" width="1.1" height="15.0" fill="rgb(226,199,23)" rx="2" ry="2" />
+<text text-anchor="" x="139.26" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo.\ (1 samples, 0.10%)</title><rect x="208.2" y="373" width="1.2" height="15.0" fill="rgb(241,79,52)" rx="2" ry="2" />
+<text text-anchor="" x="211.24" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.CustomWidget.subscribe (25 samples, 2.50%)</title><rect x="207.1" y="421" width="29.5" height="15.0" fill="rgb(237,40,22)" rx="2" ry="2" />
+<text text-anchor="" x="210.06" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.EventSource.fromCancellation (1 samples, 0.10%)</title><rect x="191.7" y="341" width="1.2" height="15.0" fill="rgb(254,145,13)" rx="2" ry="2" />
+<text text-anchor="" x="194.72" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Metrics.count (19 samples, 1.90%)</title><rect x="214.1" y="309" width="22.5" height="15.0" fill="rgb(248,143,49)" rx="2" ry="2" />
+<text text-anchor="" x="217.14" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >N..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo (1 samples, 0.10%)</title><rect x="136.3" y="469" width="1.1" height="15.0" fill="rgb(234,15,19)" rx="2" ry="2" />
+<text text-anchor="" x="139.26" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.GLib.Functions.idleAdd (675 samples, 67.50%)</title><rect x="264.9" y="517" width="796.5" height="15.0" fill="rgb(213,48,11)" rx="2" ry="2" />
+<text text-anchor="" x="267.88" y="527.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.GLib.Functions.idleAdd</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.connectSignal (1 samples, 0.10%)</title><rect x="211.8" y="293" width="1.2" height="15.0" fill="rgb(250,7,24)" rx="2" ry="2" />
+<text text-anchor="" x="214.78" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Bin.subscribe (110 samples, 11.00%)</title><rect x="133.9" y="485" width="129.8" height="15.0" fill="rgb(217,100,41)" rx="2" ry="2" />
+<text text-anchor="" x="136.90" y="495.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.Declarati..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Signals.on (7 samples, 0.70%)</title><rect x="198.8" y="341" width="8.3" height="15.0" fill="rgb(223,155,13)" rx="2" ry="2" />
+<text text-anchor="" x="201.80" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Properties.getObjectProperty (3 samples, 0.30%)</title><rect x="270.8" y="389" width="3.5" height="15.0" fill="rgb(209,138,13)" rx="2" ry="2" />
+<text text-anchor="" x="273.78" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.textBufferGetStartIter (3 samples, 0.30%)</title><rect x="1057.8" y="437" width="3.6" height="15.0" fill="rgb(231,31,40)" rx="2" ry="2" />
+<text text-anchor="" x="1060.84" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Renderer.applyAllTags (666 samples, 66.60%)</title><rect x="270.8" y="469" width="785.9" height="15.0" fill="rgb(241,106,2)" rx="2" ry="2" />
+<text text-anchor="" x="273.78" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Notewell.Renderer.applyAllTags</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Fusion.Stream.Monadic.fmap (1 samples, 0.10%)</title><rect x="1076.7" y="581" width="1.2" height="15.0" fill="rgb(221,143,44)" rx="2" ry="2" />
+<text text-anchor="" x="1079.72" y="591.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.lookup# (1 samples, 0.10%)</title><rect x="123.3" y="293" width="1.2" height="15.0" fill="rgb(233,72,12)" rx="2" ry="2" />
+<text text-anchor="" x="126.28" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.ptrToNodeType.url (7 samples, 0.70%)</title><rect x="366.4" y="373" width="8.2" height="15.0" fill="rgb(217,19,2)" rx="2" ry="2" />
+<text text-anchor="" x="369.36" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.overloadedMethod (529 samples, 52.90%)</title><rect x="427.7" y="389" width="624.2" height="15.0" fill="rgb(206,14,44)" rx="2" ry="2" />
+<text text-anchor="" x="430.72" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.Objects.TextBuffer.overloadedMethod</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.renderMarkdown (670 samples, 67.00%)</title><rect x="270.8" y="485" width="790.6" height="15.0" fill="rgb(213,196,20)" rx="2" ry="2" />
+<text text-anchor="" x="273.78" y="495.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Main.renderMarkdown</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.EventSource.fromCancellation (1 samples, 0.10%)</title><rect x="213.0" y="309" width="1.1" height="15.0" fill="rgb(209,5,36)" rx="2" ry="2" />
+<text text-anchor="" x="215.96" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Strict.Base.intersectionWith (4 samples, 0.40%)</title><rect x="46.6" y="437" width="4.7" height="15.0" fill="rgb(214,97,6)" rx="2" ry="2" />
+<text text-anchor="" x="49.58" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.wrapBoxed (1 samples, 0.10%)</title><rect x="1056.7" y="421" width="1.1" height="15.0" fill="rgb(209,56,22)" rx="2" ry="2" />
+<text text-anchor="" x="1059.66" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Strict.Base.intersectionWith.go (1 samples, 0.10%)</title><rect x="63.1" y="389" width="1.2" height="15.0" fill="rgb(209,164,41)" rx="2" ry="2" />
+<text text-anchor="" x="66.10" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.basicUnsafeCopy (1 samples, 0.10%)</title><rect x="76.1" y="405" width="1.2" height="15.0" fill="rgb(241,75,50)" rx="2" ry="2" />
+<text text-anchor="" x="79.08" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.difference.go (1 samples, 0.10%)</title><rect x="123.3" y="309" width="1.2" height="15.0" fill="rgb(247,61,41)" rx="2" ry="2" />
+<text text-anchor="" x="126.28" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Attoparsec.Internal.Types.&lt;* (1 samples, 0.10%)</title><rect x="1062.6" y="453" width="1.1" height="15.0" fill="rgb(234,148,48)" rx="2" ry="2" />
+<text text-anchor="" x="1065.56" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.Conversions.toGtkCallback.(...) (3 samples, 0.30%)</title><rect x="203.5" y="245" width="3.6" height="15.0" fill="rgb(241,26,18)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="255.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo (4 samples, 0.40%)</title><rect x="102.0" y="373" width="4.8" height="15.0" fill="rgb(226,68,15)" rx="2" ry="2" />
+<text text-anchor="" x="105.04" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Control.Concurrent.Async.asyncUsing (885 samples, 88.50%)</title><rect x="19.4" y="629" width="1044.3" height="15.0" fill="rgb(252,175,40)" rx="2" ry="2" />
+<text text-anchor="" x="22.44" y="639.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Control.Concurrent.Async.asyncUsing</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.withManagedPtr (4 samples, 0.40%)</title><rect x="58.4" y="421" width="4.7" height="15.0" fill="rgb(242,74,45)" rx="2" ry="2" />
+<text text-anchor="" x="61.38" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Attributes.get (3 samples, 0.30%)</title><rect x="270.8" y="453" width="3.5" height="15.0" fill="rgb(242,97,18)" rx="2" ry="2" />
+<text text-anchor="" x="273.78" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo (4 samples, 0.40%)</title><rect x="40.7" y="469" width="4.7" height="15.0" fill="rgb(225,4,26)" rx="2" ry="2" />
+<text text-anchor="" x="43.68" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo.\ (4 samples, 0.40%)</title><rect x="176.4" y="389" width="4.7" height="15.0" fill="rgb(222,181,16)" rx="2" ry="2" />
+<text text-anchor="" x="179.38" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.collectAttributes.go (4 samples, 0.40%)</title><rect x="77.3" y="405" width="4.7" height="15.0" fill="rgb(235,96,22)" rx="2" ry="2" />
+<text text-anchor="" x="80.26" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.view' (3 samples, 0.30%)</title><rect x="203.5" y="213" width="3.6" height="15.0" fill="rgb(232,202,49)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="223.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.EventSource.&lt;&gt; (4 samples, 0.40%)</title><rect x="152.8" y="453" width="4.7" height="15.0" fill="rgb(248,110,32)" rx="2" ry="2" />
+<text text-anchor="" x="155.78" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.withManagedPtr (4 samples, 0.40%)</title><rect x="176.4" y="405" width="4.7" height="15.0" fill="rgb(229,150,23)" rx="2" ry="2" />
+<text text-anchor="" x="179.38" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Editor.markdownEditor (22 samples, 2.20%)</title><rect x="210.6" y="341" width="26.0" height="15.0" fill="rgb(208,197,30)" rx="2" ry="2" />
+<text text-anchor="" x="213.60" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >N..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.totext (4 samples, 0.40%)</title><rect x="369.9" y="357" width="4.7" height="15.0" fill="rgb(207,95,21)" rx="2" ry="2" />
+<text text-anchor="" x="372.90" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.setupCancellation (1 samples, 0.10%)</title><rect x="157.5" y="437" width="1.2" height="15.0" fill="rgb(216,125,51)" rx="2" ry="2" />
+<text text-anchor="" x="160.50" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Strict.Base.intersectionWith.go (3 samples, 0.30%)</title><rect x="47.8" y="421" width="3.5" height="15.0" fill="rgb(221,86,50)" rx="2" ry="2" />
+<text text-anchor="" x="50.76" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Events.getDefaultTheme (3 samples, 0.30%)</title><rect x="203.5" y="133" width="3.6" height="15.0" fill="rgb(242,155,34)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="143.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.toolbar.\ (3 samples, 0.30%)</title><rect x="203.5" y="149" width="3.6" height="15.0" fill="rgb(232,118,34)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="159.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.\ (1 samples, 0.10%)</title><rect x="263.7" y="405" width="1.2" height="15.0" fill="rgb(212,5,4)" rx="2" ry="2" />
+<text text-anchor="" x="266.70" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.EventSource.&lt;&gt; (1 samples, 0.10%)</title><rect x="262.5" y="437" width="1.2" height="15.0" fill="rgb(229,148,10)" rx="2" ry="2" />
+<text text-anchor="" x="265.52" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.onM (3 samples, 0.30%)</title><rect x="203.5" y="181" width="3.6" height="15.0" fill="rgb(215,152,13)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="191.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo.\ (1 samples, 0.10%)</title><rect x="136.3" y="437" width="1.1" height="15.0" fill="rgb(209,70,25)" rx="2" ry="2" />
+<text text-anchor="" x="139.26" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.updateProperties.toMaybeSetOp (2 samples, 0.20%)</title><rect x="48.9" y="405" width="2.4" height="15.0" fill="rgb(232,142,47)" rx="2" ry="2" />
+<text text-anchor="" x="51.94" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.textBufferGetLineCount (1 samples, 0.10%)</title><rect x="221.2" y="293" width="1.2" height="15.0" fill="rgb(213,215,4)" rx="2" ry="2" />
+<text text-anchor="" x="224.22" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Fusion.Util.&gt;&gt;= (3 samples, 0.30%)</title><rect x="52.5" y="437" width="3.5" height="15.0" fill="rgb(218,113,6)" rx="2" ry="2" />
+<text text-anchor="" x="55.48" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.basicUnsafeFreeze (1 samples, 0.10%)</title><rect x="107.9" y="373" width="1.2" height="15.0" fill="rgb(238,33,20)" rx="2" ry="2" />
+<text text-anchor="" x="110.94" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.editorHelper (22 samples, 2.20%)</title><rect x="210.6" y="357" width="26.0" height="15.0" fill="rgb(236,35,52)" rx="2" ry="2" />
+<text text-anchor="" x="213.60" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >M..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.difference (1 samples, 0.10%)</title><rect x="123.3" y="325" width="1.2" height="15.0" fill="rgb(213,33,39)" rx="2" ry="2" />
+<text text-anchor="" x="126.28" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.startWithTheme.app (3 samples, 0.30%)</title><rect x="203.5" y="229" width="3.6" height="15.0" fill="rgb(252,15,52)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="239.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Utils.callocBoxedBytes (1 samples, 0.10%)</title><rect x="1060.2" y="421" width="1.2" height="15.0" fill="rgb(215,156,1)" rx="2" ry="2" />
+<text text-anchor="" x="1063.20" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.updateProperties (6 samples, 0.60%)</title><rect x="45.4" y="469" width="7.1" height="15.0" fill="rgb(210,78,13)" rx="2" ry="2" />
+<text text-anchor="" x="48.40" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Bin.bin (1 samples, 0.10%)</title><rect x="1070.8" y="613" width="1.2" height="15.0" fill="rgb(214,41,8)" rx="2" ry="2" />
+<text text-anchor="" x="1073.82" y="623.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.EventHandler.toEventHandler (3 samples, 0.30%)</title><rect x="203.5" y="165" width="3.6" height="15.0" fill="rgb(206,209,51)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="175.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Control.Monad.Primitive.primitive (1 samples, 0.10%)</title><rect x="259.0" y="389" width="1.2" height="15.0" fill="rgb(226,151,39)" rx="2" ry="2" />
+<text text-anchor="" x="261.98" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.App.Simple.runUI_ (204 samples, 20.40%)</title><rect x="24.2" y="533" width="240.7" height="15.0" fill="rgb(250,42,26)" rx="2" ry="2" />
+<text text-anchor="" x="27.16" y="543.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.Declarative.App.Simple.ru..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.ownedFinalizer (2 samples, 0.20%)</title><rect x="270.8" y="325" width="2.3" height="15.0" fill="rgb(223,67,20)" rx="2" ry="2" />
+<text text-anchor="" x="273.78" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Strict.Base.intersectionWith (1 samples, 0.10%)</title><rect x="63.1" y="405" width="1.2" height="15.0" fill="rgb(212,96,7)" rx="2" ry="2" />
+<text text-anchor="" x="66.10" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.EventSource.&lt;&gt; (1 samples, 0.10%)</title><rect x="158.7" y="469" width="1.2" height="15.0" fill="rgb(215,228,11)" rx="2" ry="2" />
+<text text-anchor="" x="161.68" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Collected.updateProperties.setOps (1 samples, 0.10%)</title><rect x="63.1" y="421" width="1.2" height="15.0" fill="rgb(252,108,3)" rx="2" ry="2" />
+<text text-anchor="" x="66.10" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.BasicConversions.withTextCString (2 samples, 0.20%)</title><rect x="201.2" y="293" width="2.3" height="15.0" fill="rgb(248,73,50)" rx="2" ry="2" />
+<text text-anchor="" x="204.16" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Theming.readTheme (2 samples, 0.20%)</title><rect x="1082.6" y="661" width="2.4" height="15.0" fill="rgb(211,23,3)" rx="2" ry="2" />
+<text text-anchor="" x="1085.62" y="671.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.startWithTheme.app (677 samples, 67.70%)</title><rect x="264.9" y="549" width="798.8" height="15.0" fill="rgb(228,114,12)" rx="2" ry="2" />
+<text text-anchor="" x="267.88" y="559.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Main.startWithTheme.app</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.resolveExts (1 samples, 0.10%)</title><rect x="274.3" y="405" width="1.2" height="15.0" fill="rgb(225,156,4)" rx="2" ry="2" />
+<text text-anchor="" x="277.32" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Attoparsec.Internal.Types.&gt;&gt;=.\ (3 samples, 0.30%)</title><rect x="203.5" y="53" width="3.6" height="15.0" fill="rgb(251,33,35)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="63.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Properties.getObjectPropertyString (3 samples, 0.30%)</title><rect x="270.8" y="405" width="3.5" height="15.0" fill="rgb(225,25,50)" rx="2" ry="2" />
+<text text-anchor="" x="273.78" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Signals.on (2 samples, 0.20%)</title><rect x="210.6" y="309" width="2.4" height="15.0" fill="rgb(231,184,36)" rx="2" ry="2" />
+<text text-anchor="" x="213.60" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.withManagedPtr (4 samples, 0.40%)</title><rect x="102.0" y="357" width="4.8" height="15.0" fill="rgb(238,202,2)" rx="2" ry="2" />
+<text text-anchor="" x="105.04" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo (4 samples, 0.40%)</title><rect x="176.4" y="421" width="4.7" height="15.0" fill="rgb(224,116,5)" rx="2" ry="2" />
+<text text-anchor="" x="179.38" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Renderer.applyTag (547 samples, 54.70%)</title><rect x="411.2" y="405" width="645.5" height="15.0" fill="rgb(247,102,52)" rx="2" ry="2" />
+<text text-anchor="" x="414.20" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Notewell.Renderer.applyTag</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Events.getDefaultTheme (2 samples, 0.20%)</title><rect x="1061.4" y="501" width="2.3" height="15.0" fill="rgb(239,96,30)" rx="2" ry="2" />
+<text text-anchor="" x="1064.38" y="511.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Strict.Base.insert (1 samples, 0.10%)</title><rect x="120.9" y="293" width="1.2" height="15.0" fill="rgb(246,109,41)" rx="2" ry="2" />
+<text text-anchor="" x="123.92" y="303.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.GValue.newGValue (2 samples, 0.20%)</title><rect x="270.8" y="373" width="2.3" height="15.0" fill="rgb(240,177,50)" rx="2" ry="2" />
+<text text-anchor="" x="273.78" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Notewell.Renderer.applyTag.ec (1 samples, 0.10%)</title><rect x="1051.9" y="389" width="1.2" height="15.0" fill="rgb(236,72,29)" rx="2" ry="2" />
+<text text-anchor="" x="1054.94" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.withManagedPtr (5 samples, 0.50%)</title><rect x="192.9" y="309" width="5.9" height="15.0" fill="rgb(207,205,16)" rx="2" ry="2" />
+<text text-anchor="" x="195.90" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Base.difference.go (1 samples, 0.10%)</title><rect x="51.3" y="421" width="1.2" height="15.0" fill="rgb(216,105,14)" rx="2" ry="2" />
+<text text-anchor="" x="54.30" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.BasicConversions.textToCString (1 samples, 0.10%)</title><rect x="201.2" y="277" width="1.1" height="15.0" fill="rgb(209,34,41)" rx="2" ry="2" />
+<text text-anchor="" x="204.16" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Fusion.Stream.Monadic.fmap (1 samples, 0.10%)</title><rect x="113.8" y="357" width="1.2" height="15.0" fill="rgb(254,25,33)" rx="2" ry="2" />
+<text text-anchor="" x="116.84" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr' (1 samples, 0.10%)</title><rect x="136.3" y="405" width="1.1" height="15.0" fill="rgb(214,196,16)" rx="2" ry="2" />
+<text text-anchor="" x="139.26" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr' (4 samples, 0.40%)</title><rect x="194.1" y="261" width="4.7" height="15.0" fill="rgb(223,132,11)" rx="2" ry="2" />
+<text text-anchor="" x="197.08" y="271.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.Signals.on (6 samples, 0.60%)</title><rect x="145.7" y="405" width="7.1" height="15.0" fill="rgb(209,152,15)" rx="2" ry="2" />
+<text text-anchor="" x="148.70" y="415.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Attoparsec.Internal.Types.&lt;* (3 samples, 0.30%)</title><rect x="203.5" y="85" width="3.6" height="15.0" fill="rgb(222,65,13)" rx="2" ry="2" />
+<text text-anchor="" x="206.52" y="95.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.resolveExts.resolveExt (1 samples, 0.10%)</title><rect x="274.3" y="389" width="1.2" height="15.0" fill="rgb(249,46,46)" rx="2" ry="2" />
+<text text-anchor="" x="277.32" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.withManagedPtr (1 samples, 0.10%)</title><rect x="136.3" y="453" width="1.1" height="15.0" fill="rgb(252,130,13)" rx="2" ry="2" />
+<text text-anchor="" x="139.26" y="463.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr' (2 samples, 0.20%)</title><rect x="60.7" y="373" width="2.4" height="15.0" fill="rgb(253,162,13)" rx="2" ry="2" />
+<text text-anchor="" x="63.74" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Array.copy (1 samples, 0.10%)</title><rect x="47.8" y="325" width="1.1" height="15.0" fill="rgb(240,93,10)" rx="2" ry="2" />
+<text text-anchor="" x="50.76" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Objects.TextBuffer.textBufferGetIterAtLineOffset (409 samples, 40.90%)</title><rect x="569.3" y="373" width="482.6" height="15.0" fill="rgb(253,74,32)" rx="2" ry="2" />
+<text text-anchor="" x="572.32" y="383.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.Objects.TextBuffer.textBufferGetIterAtLineOffset</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeManagedPtrCastPtr.ptr (2 samples, 0.20%)</title><rect x="567.0" y="325" width="2.3" height="15.0" fill="rgb(233,14,39)" rx="2" ry="2" />
+<text text-anchor="" x="569.96" y="335.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.basicUnsafeCopy (1 samples, 0.10%)</title><rect x="155.1" y="437" width="1.2" height="15.0" fill="rgb(245,21,28)" rx="2" ry="2" />
+<text text-anchor="" x="158.14" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo.\ (4 samples, 0.40%)</title><rect x="139.8" y="357" width="4.7" height="15.0" fill="rgb(207,162,19)" rx="2" ry="2" />
+<text text-anchor="" x="142.80" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newObject (1 samples, 0.10%)</title><rect x="163.4" y="389" width="1.2" height="15.0" fill="rgb(239,171,13)" rx="2" ry="2" />
+<text text-anchor="" x="166.40" y="399.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newObject (5 samples, 0.50%)</title><rect x="192.9" y="277" width="5.9" height="15.0" fill="rgb(253,128,34)" rx="2" ry="2" />
+<text text-anchor="" x="195.90" y="287.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.unsafeCastTo (2 samples, 0.20%)</title><rect x="162.2" y="437" width="2.4" height="15.0" fill="rgb(238,114,26)" rx="2" ry="2" />
+<text text-anchor="" x="165.22" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Main.update' (677 samples, 67.70%)</title><rect x="264.9" y="533" width="798.8" height="15.0" fill="rgb(242,90,30)" rx="2" ry="2" />
+<text text-anchor="" x="267.88" y="543.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Main.update'</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.SingleWidget.subscribe (1 samples, 0.10%)</title><rect x="263.7" y="437" width="1.2" height="15.0" fill="rgb(254,35,54)" rx="2" ry="2" />
+<text text-anchor="" x="266.70" y="447.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.GI.Base.ManagedPtr.newManagedPtr' (1 samples, 0.10%)</title><rect x="208.2" y="341" width="1.2" height="15.0" fill="rgb(237,10,8)" rx="2" ry="2" />
+<text text-anchor="" x="211.24" y="351.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Attributes.Internal.addSignalHandler.setupCancellation (7 samples, 0.70%)</title><rect x="190.5" y="357" width="8.3" height="15.0" fill="rgb(221,74,54)" rx="2" ry="2" />
+<text text-anchor="" x="193.54" y="367.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CMarkGFM.commonmarkToNode (96 samples, 9.60%)</title><rect x="274.3" y="421" width="113.3" height="15.0" fill="rgb(235,189,39)" rx="2" ry="2" />
+<text text-anchor="" x="277.32" y="431.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >CMarkGFM.comm..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.GLib.Callbacks.wrap_SourceFunc (672 samples, 67.20%)</title><rect x="268.4" y="501" width="793.0" height="15.0" fill="rgb(231,57,8)" rx="2" ry="2" />
+<text text-anchor="" x="271.42" y="511.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.GLib.Callbacks.wrap_SourceFunc</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.HashMap.Array.copy.\ (1 samples, 0.10%)</title><rect x="47.8" y="309" width="1.1" height="15.0" fill="rgb(243,183,43)" rx="2" ry="2" />
+<text text-anchor="" x="50.76" y="319.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Data.Vector.Mutable.basicUnsafeNew (1 samples, 0.10%)</title><rect x="1077.9" y="597" width="1.2" height="15.0" fill="rgb(228,80,45)" rx="2" ry="2" />
+<text text-anchor="" x="1080.90" y="607.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  ></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GI.Gtk.Declarative.Widget.subscribe (88 samples, 8.80%)</title><rect x="159.9" y="469" width="103.8" height="15.0" fill="rgb(251,68,36)" rx="2" ry="2" />
+<text text-anchor="" x="162.86" y="479.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >GI.Gtk.Decla..</text>
+</g>
+</svg>

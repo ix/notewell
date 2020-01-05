@@ -88,25 +88,37 @@ applyNode buffer (Node (Just pos) (LIST _) children) = do
 applyNode buffer (Node (Just pos) BLOCK_QUOTE children) = do
   applyTag buffer pos "blockquote"
   mapM_ (applyNode buffer) children
-applyNode _      (Node _ (TEXT _) _       ) = return ()
+applyNode _      (Node _ (TEXT _) _       ) = pure ()
 applyNode buffer (Node _ _        children) = mapM_ (applyNode buffer) children
 
 -- | Build a TextTagTable from a Theme.
 markdownTextTagTable :: Theme -> IO TextTagTable
 markdownTextTagTable theme = do
   table <- textTagTableNew
+  populateTable table theme
+  pure table
+
+-- | Add tags for a Theme to a TextTagTable.
+populateTable :: TextTagTable -> Theme -> IO ()
+populateTable table theme = do
   mapM_ (textTagTableAdd table <=< uncurry mkTag) $ HM.toList $ elements theme
-  mapM_ ((textTagTableAdd table =<<) . mkHeadingTag heading) [1 .. 6]
-  return table
- where
-  heading      = fromMaybe mempty $ HM.lookup "heading" $ elements theme
+  mapM_ ((textTagTableAdd table =<<) . mkHeadingTag heading) [1..6]
+ where heading = fromMaybe mempty $ HM.lookup "heading" $ elements theme
+
+-- | Remove all tags for a theme from a TextTagTable.
+clearTable :: TextTagTable -> Theme -> IO ()
+clearTable table theme =
+  forM_ tagNames $ \name -> do
+  maybeTag <- textTagTableLookup table name
+  whenM maybeTag $ textTagTableRemove table
+  where tagNames = HM.keys $ elements theme
 
 -- | Given a name and some TagProperties, produce a TextTag.
 mkTag :: Text -> TagProperties -> IO TextTag
 mkTag name properties = do
   tag <- textTagNew $ Just name
   mapM_ (`apply` tag) properties
-  return tag
+  pure tag
   where
     apply :: TagProperty -> TextTag -> IO ()
     apply (Color color)        = flip setTextTagForeground color
@@ -124,7 +136,7 @@ mkHeadingTag :: TagProperties -> Level -> IO TextTag
 mkHeadingTag properties level = do
   tag <- mkTag (T.pack $ "heading" ++ show level) properties
   setTextTagScale tag $ scaling level
-  return tag
+  pure tag
  where
   scaling n | n <= 1    = 3
             | n == 2    = 2.5

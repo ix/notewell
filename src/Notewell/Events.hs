@@ -7,7 +7,10 @@
 -}
 module Notewell.Events where
 
-import Notewell.Metrics (Metrics)
+import Data.Either      (fromRight)
+import Notewell.Metrics
+import Notewell.Theming
+import System.FilePath.Posix ((</>))
 
 data ThemeType = Light | Dark
 
@@ -24,3 +27,8 @@ data Event = Closed                            -- ^ The window was closed.
 fromBool :: Bool -> ThemeType
 fromBool False = Light
 fromBool True  = Dark
+
+-- | Set the default light or dark theme according to a ThemeType.
+getDefaultTheme :: ThemeType -> IO Theme
+getDefaultTheme Light = fromRight defaultTheme <$> readTheme ("themes" </> "giorno.json")
+getDefaultTheme Dark  = fromRight defaultTheme <$> readTheme ("themes" </> "notte.json")
